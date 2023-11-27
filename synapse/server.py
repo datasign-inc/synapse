@@ -150,7 +150,7 @@ if TYPE_CHECKING:
     from txredisapi import ConnectionHandler
 
     from synapse.handlers.jwt import JwtHandler
-    from synapse.handlers.oidc import OidcHandler
+    from synapse.handlers.oidc import OidcHandler, SIOPv2Handler
     from synapse.handlers.saml import SamlHandler
 
 

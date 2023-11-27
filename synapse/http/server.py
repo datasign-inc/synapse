@@ -784,7 +784,9 @@ def respond_with_json(
         encoder = _encode_json_bytes
 
     # todo: Implement a standard mechanism that can respond to non-JSON
-    if request.path.startswith(b"/_matrix/client/v3/siopv2_request") and isinstance(json_object, bytes):
+    if request.path.startswith(b"/_matrix/client/v3/siopv2_request") and isinstance(
+        json_object, bytes
+    ):
         request.setHeader(b"Content-Type", b"application/oauth-authz-req+jwt")
     else:
         request.setHeader(b"Content-Type", b"application/json")
@@ -865,7 +867,9 @@ async def _async_write_json_to_request_in_thread(
             opentracing_span.log_kv({"event": "encoded"})
         return res
 
-    if request.path.startswith(b"/_matrix/client/v3/siopv2_request") and isinstance(json_object, bytes):
+    if request.path.startswith(b"/_matrix/client/v3/siopv2_request") and isinstance(
+        json_object, bytes
+    ):
         json_str = json_object
         logger.info(f"json_str = {json_str}")
     else:

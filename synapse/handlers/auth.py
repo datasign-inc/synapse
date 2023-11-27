@@ -73,10 +73,12 @@ from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import base62_encode
+from synapse.util.stringutils import (
+    add_query_param_to_url,
+    base62_encode,
+    random_string,
+)
 from synapse.util.threepids import canonicalise_email
-from synapse.util.stringutils import random_string
-from synapse.util.stringutils import add_query_param_to_url
 
 if TYPE_CHECKING:
     from synapse.module_api import ModuleApi
@@ -564,7 +566,9 @@ class AuthHandler:
         )
 
         if not authdict:
-            auth_dict_for_flows = await self._auth_dict_for_flows(flows, session.session_id)
+            auth_dict_for_flows = await self._auth_dict_for_flows(
+                flows, session.session_id
+            )
             raise InteractiveAuthIncompleteError(
                 session.session_id, auth_dict_for_flows
             )
@@ -754,27 +758,29 @@ class AuthHandler:
 
         # todo: fix hard-coding of paths
         redirect_uri = add_sid(
-            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_response"),
-            sid)
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_response"), sid
+        )
 
         request_uri = add_sid(
-            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_request"),
-            sid)
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_request"), sid
+        )
 
         polling_uri = add_sid(
             urllib.parse.urljoin(base_url, "/_matrix/client/v3/loginToken_by_siopv2"),
-            sid)
+            sid,
+        )
 
         client_metadata_uri = add_sid(
             urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_client_metadata"),
-            sid)
+            sid,
+        )
 
         return {
             "client_metadata_uri": client_metadata_uri,
             "request_uri": request_uri,
             "redirect_uri": redirect_uri,
             "client_id": redirect_uri,
-            "polling_uri": polling_uri
+            "polling_uri": polling_uri,
         }
 
     async def _auth_dict_for_flows(
@@ -1819,7 +1825,7 @@ class AuthHandler:
             registered_user_id,
             auth_provider_id=auth_provider_id,
             auth_provider_session_id=auth_provider_session_id,
-            siopv2_sid=siopv2_sid
+            siopv2_sid=siopv2_sid,
         )
 
         # Append the login token to the original redirect URL (i.e. with its query

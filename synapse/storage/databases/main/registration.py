@@ -1793,10 +1793,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         created_ts = self._clock.time_msec()
         status = "created"
         await self.db_pool.simple_insert(
-            "siopv2_session",
-            {"sid": sid,
-             "status": status,
-             "created_ts": created_ts}
+            "siopv2_session", {"sid": sid, "status": status, "created_ts": created_ts}
         )
 
     async def register_ro_nonce(self, sid, nonce):
@@ -1860,7 +1857,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def invalidate_siopv2_session(self, sid) -> None:
         await self.update_siopv2_session_status(sid, "invalidated")
-
 
     async def lookup_refresh_token(
         self, token: str
@@ -1972,7 +1968,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         logger.info("return value from database : %s", value)
         return value
 
-
     async def add_login_token_to_user(
         self,
         user_id: str,
@@ -1980,7 +1975,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiry_ts: int,
         auth_provider_id: Optional[str],
         auth_provider_session_id: Optional[str],
-        siopv2_sid : Optional[str] = None,
+        siopv2_sid: Optional[str] = None,
     ) -> None:
         """Adds a short-term login token for the given user.
 

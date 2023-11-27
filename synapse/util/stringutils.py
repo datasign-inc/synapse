@@ -73,12 +73,14 @@ def assert_valid_client_secret(client_secret: str) -> None:
             400, "Invalid client_secret parameter", errcode=Codes.INVALID_PARAM
         )
 
+
 def add_query_param_to_url(url: str, param_name: str, param: Any) -> str:
     url_parts = list(urllib.parse.urlparse(url))
     query = urllib.parse.parse_qsl(url_parts[4], keep_blank_values=True)
     query.append((param_name, param))
     url_parts[4] = urllib.parse.urlencode(query)
     return urllib.parse.urlunparse(url_parts)
+
 
 def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
     """Split a server name into host/port parts.
