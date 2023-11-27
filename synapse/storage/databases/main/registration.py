@@ -1789,6 +1789,79 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="mark_access_token_as_used",
         )
 
+    async def register_siopv2_session(self, sid):
+        created_ts = self._clock.time_msec()
+        status = "created"
+        await self.db_pool.simple_insert(
+            "siopv2_session",
+            {"sid": sid,
+             "status": status,
+             "created_ts": created_ts}
+        )
+
+    async def register_ro_nonce(self, sid, nonce):
+        # todo: Use transaction
+        await self.db_pool.simple_update_one(
+            table="siopv2_session",
+            keyvalues={"sid": sid},
+            updatevalues={"ro_nonce": nonce},
+        )
+
+    async def lookup_ro_nonce(self, sid) -> Optional[str]:
+        ret = await self.db_pool.simple_select_one(
+            table="siopv2_session",
+            keyvalues={"sid": sid},
+            retcols=["ro_nonce"],
+        )
+        if ret is None:
+            return None
+        return ret["ro_nonce"]
+
+    async def lookup_rsa_key(self, kid: str) -> Optional[dict]:
+        return await self.db_pool.simple_select_one(
+            table="siopv2_signing_rsa_key",
+            keyvalues={"kid": kid},
+            retcols=["kid", "kty", "n", "e", "d", "p", "q", "dp", "dq", "qi"],
+        )
+
+    async def validate_siopv2_session(self, sid, expected_status) -> bool:
+        # todo: Allow reference from other functions
+        siopv2_session_timeout = 300000
+
+        ret = await self.db_pool.simple_select_one(
+            table="siopv2_session",
+            keyvalues={"sid": sid},
+            retcols=["status", "created_ts"],
+        )
+        if ret is None:
+            logger.info("siopv2_session_not_found sid=%s" % sid)
+            return False
+
+        status = ret["status"]
+        if status == "invalidated":
+            logger.info("siopv2_session_invalidated sid=%s" % sid)
+            return False
+
+        created_ts = ret["created_ts"]
+        now = self._clock.time_msec()
+        if created_ts + siopv2_session_timeout < now:
+            logger.info("siopv2_session_timeout sid=%s" % sid)
+            return False
+
+        return status == expected_status
+
+    async def update_siopv2_session_status(self, sid: str, status: str) -> None:
+        # todo: Use transaction
+        await self.db_pool.simple_update_one(
+            table="siopv2_session",
+            keyvalues={"sid": sid},
+            updatevalues={"status": status},
+        )
+
+    async def invalidate_siopv2_session(self, sid) -> None:
+        await self.update_siopv2_session_status(sid, "invalidated")
+
+
     async def lookup_refresh_token(
         self, token: str
     ) -> Optional[RefreshTokenLookupResult]:
@@ -1890,6 +1963,16 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "replace_refresh_token", _replace_refresh_token_txn
         )
 
+    async def get_login_token_for_siopv2_sid(self, siopv2_sid: str) -> str:
+        value = await self.db_pool.simple_select_one_onecol(
+            table="login_tokens",
+            keyvalues={"siopv2_sid": siopv2_sid},
+            retcol="token",
+        )
+        logger.info("return value from database : %s", value)
+        return value
+
+
     async def add_login_token_to_user(
         self,
         user_id: str,
@@ -1897,6 +1980,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiry_ts: int,
         auth_provider_id: Optional[str],
         auth_provider_session_id: Optional[str],
+        siopv2_sid : Optional[str] = None,
     ) -> None:
         """Adds a short-term login token for the given user.
 
@@ -1910,6 +1994,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             auth_provider_session_id: The session ID advertised by the SSO Identity
                 Provider, if any.
         """
+
+        value_for_siopv2_sid = "" if siopv2_sid is None else siopv2_sid
+
         await self.db_pool.simple_insert(
             "login_tokens",
             {
@@ -1918,6 +2005,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "expiry_ts": expiry_ts,
                 "auth_provider_id": auth_provider_id,
                 "auth_provider_session_id": auth_provider_session_id,
+                "siopv2_sid": value_for_siopv2_sid,
             },
             desc="add_login_token_to_user",
         )

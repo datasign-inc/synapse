@@ -785,6 +785,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return OidcHandler(self)
 
     @cache_in_self
+    def get_siopv2_handler(self) -> "SIOPv2Handler":
+        from synapse.handlers.oidc import SIOPv2Handler
+
+        return SIOPv2Handler(self)
+
+    @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
         return EventClientSerializer(self)
 

@@ -75,6 +75,8 @@ from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
+from synapse.util.stringutils import random_string
+from synapse.util.stringutils import add_query_param_to_url
 
 if TYPE_CHECKING:
     from synapse.module_api import ModuleApi
@@ -562,8 +564,9 @@ class AuthHandler:
         )
 
         if not authdict:
+            auth_dict_for_flows = await self._auth_dict_for_flows(flows, session.session_id)
             raise InteractiveAuthIncompleteError(
-                session.session_id, self._auth_dict_for_flows(flows, session.session_id)
+                session.session_id, auth_dict_for_flows
             )
 
         # check auth type currently being presented
@@ -599,7 +602,7 @@ class AuthHandler:
 
                 return creds, clientdict, session.session_id
 
-        ret = self._auth_dict_for_flows(flows, session.session_id)
+        ret = await self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(session.session_id, ret)
@@ -736,7 +739,45 @@ class AuthHandler:
             }
         }
 
-    def _auth_dict_for_flows(
+    async def _create_siopv2_session(self) -> str:
+        sid = random_string(32)
+        # todo: check whether sid is already registered
+        await self.store.register_siopv2_session(sid)
+        return sid
+
+    async def _get_params_siopv2(self) -> dict:
+        sid = await self._create_siopv2_session()
+        base_url = self.hs.config.server.public_baseurl
+
+        def add_sid(url, sid):
+            return add_query_param_to_url(url, "sv2sid", sid)
+
+        # todo: fix hard-coding of paths
+        redirect_uri = add_sid(
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_response"),
+            sid)
+
+        request_uri = add_sid(
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_request"),
+            sid)
+
+        polling_uri = add_sid(
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/loginToken_by_siopv2"),
+            sid)
+
+        client_metadata_uri = add_sid(
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_client_metadata"),
+            sid)
+
+        return {
+            "client_metadata_uri": client_metadata_uri,
+            "request_uri": request_uri,
+            "redirect_uri": redirect_uri,
+            "client_id": redirect_uri,
+            "polling_uri": polling_uri
+        }
+
+    async def _auth_dict_for_flows(
         self,
         flows: List[List[str]],
         session_id: str,
@@ -748,6 +789,7 @@ class AuthHandler:
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
             LoginType.TERMS: self._get_params_terms,
+            LoginType.SIOPv2: self._get_params_siopv2,
         }
 
         params: Dict[str, Any] = {}
@@ -755,7 +797,7 @@ class AuthHandler:
         for f in public_flows:
             for stage in f:
                 if stage in get_params and stage not in params:
-                    params[stage] = get_params[stage]()
+                    params[stage] = await get_params[stage]()
 
         return {
             "session": session_id,
@@ -903,6 +945,7 @@ class AuthHandler:
         duration_ms: int = (2 * 60 * 1000),
         auth_provider_id: Optional[str] = None,
         auth_provider_session_id: Optional[str] = None,
+        siopv2_sid: Optional[str] = None,
     ) -> str:
         login_token = self.generate_login_token()
         now = self._clock.time_msec()
@@ -913,6 +956,7 @@ class AuthHandler:
             expiry_ts=expiry_ts,
             auth_provider_id=auth_provider_id,
             auth_provider_session_id=auth_provider_session_id,
+            siopv2_sid=siopv2_sid,
         )
         return login_token
 
@@ -1729,6 +1773,7 @@ class AuthHandler:
         extra_attributes: Optional[JsonDict] = None,
         new_user: bool = False,
         auth_provider_session_id: Optional[str] = None,
+        siopv2_sid: Optional[str] = None,
     ) -> None:
         """Having figured out a mxid for this user, complete the HTTP request
 
@@ -1774,12 +1819,13 @@ class AuthHandler:
             registered_user_id,
             auth_provider_id=auth_provider_id,
             auth_provider_session_id=auth_provider_session_id,
+            siopv2_sid=siopv2_sid
         )
 
         # Append the login token to the original redirect URL (i.e. with its query
         # parameters kept intact) to build the URL to which the template needs to
         # redirect the users once they have clicked on the confirmation link.
-        redirect_url = self.add_query_param_to_url(
+        redirect_url = add_query_param_to_url(
             client_redirect_url, "loginToken", login_token
         )
 
@@ -1849,14 +1895,6 @@ class AuthHandler:
         for user_id in to_expire:
             logger.debug("Expiring extra attributes for user %s", user_id)
             del self._extra_attributes[user_id]
-
-    @staticmethod
-    def add_query_param_to_url(url: str, param_name: str, param: Any) -> str:
-        url_parts = list(urllib.parse.urlparse(url))
-        query = urllib.parse.parse_qsl(url_parts[4], keep_blank_values=True)
-        query.append((param_name, param))
-        url_parts[4] = urllib.parse.urlencode(query)
-        return urllib.parse.urlunparse(url_parts)
 
 
 def load_legacy_password_auth_providers(hs: "HomeServer") -> None:

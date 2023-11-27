@@ -51,6 +51,11 @@ from synapse.rest.client import (
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
+    siopv2_response,
+    siopv2_request,
+    siopv2_login_token,
+    siopv2_client_metadata,
+    siopv2_jwks,
     sync,
     tags,
     thirdparty,
@@ -112,6 +117,12 @@ class ClientRestResource(JsonResource):
         register.register_servlets(hs, client_resource)
         if is_main_process:
             auth.register_servlets(hs, client_resource)
+        if is_main_process:
+            siopv2_response.register_servlets(hs, client_resource)
+            siopv2_request.register_servlets(hs, client_resource)
+            siopv2_login_token.register_servlets(hs, client_resource)
+            siopv2_client_metadata.register_servlets(hs, client_resource)
+            siopv2_jwks.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
         room_keys.register_servlets(hs, client_resource)
