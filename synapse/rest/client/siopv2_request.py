@@ -64,11 +64,6 @@ class HandleSIOPv2Request(RestServlet):
 
         ro_jwt = jwt.encode({"alg": "RS256"}, payload, self.jwt_signing_key)
 
-        # todo: application/oauth-authz-req+jwt
-        request.responseHeaders.setRawHeaders(
-            b"Content-Type", [b"application/oauth-authz-req+jwt"]
-        )
-
         return 200, ro_jwt
 
 
