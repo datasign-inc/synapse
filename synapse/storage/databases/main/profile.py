@@ -48,6 +48,7 @@ class ProfileWorkerStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             "populate_full_user_id_profiles", self.populate_full_user_id_profiles
         )
+        self._clock = hs.get_clock()
 
     async def populate_full_user_id_profiles(
         self, progress: JsonDict, batch_size: int
@@ -214,6 +215,63 @@ class ProfileWorkerStore(SQLBaseStore):
             values={"avatar_url": new_avatar_url, "full_user_id": user_id.to_string()},
             desc="set_profile_avatar_url",
         )
+
+    async def start_vp_session(self, vpsid: str, vp_type: str, ro_nonce: str) -> None:
+        await self.db_pool.simple_insert(
+            table="vp_session_management",
+            values={
+                "sid": vpsid,
+                "vp_type": vp_type,
+                "status": "created",
+                "ro_nonce": ro_nonce,
+                "created_ts": self._clock.time_msec(),
+            },
+            desc="start_vp_session",
+        )
+
+    async def lookup_vp_nonce(self, sid) -> Optional[str]:
+        ret = await self.db_pool.simple_select_one(
+            table="vp_session_management",
+            keyvalues={"sid": sid},
+            retcols=["ro_nonce"],
+        )
+        if ret is None:
+            return None
+        (ro_nonce,) = ret
+        return ro_nonce
+
+    async def lookup_vp_type(self, sid) -> Optional[str]:
+        ret = await self.db_pool.simple_select_one(
+            table="vp_session_management",
+            keyvalues={"sid": sid},
+            retcols=["vp_type"],
+        )
+        if ret is None:
+            return None
+        (vp_type,) = ret
+        return vp_type
+
+    async def validate_vp_session(self, sid, expected_status) -> bool:
+        # todo: Allow reference from other functions
+        vp_session_timeout = 300000
+
+        ret = await self.db_pool.simple_select_one(
+            table="vp_session_management",
+            keyvalues={"sid": sid},
+            retcols=["status", "created_ts"],
+        )
+        if ret is None:
+            return False
+
+        status, created_ts = ret
+        if status == "invalidated":
+            return False
+
+        now = self._clock.time_msec()
+        if created_ts + vp_session_timeout < now:
+            return False
+
+        return status == expected_status
 
 
 class ProfileStore(ProfileWorkerStore):
