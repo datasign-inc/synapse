@@ -1818,7 +1818,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     async def lookup_rsa_key(self, kid: str) -> Optional[dict]:
         cols = ["kid", "kty", "n", "e", "d", "p", "q", "dp", "dq", "qi"]
         ret = await self.db_pool.simple_select_one(
-            table="siopv2_signing_rsa_key",
+            table="request_object_signing_rsa_key",
             keyvalues={"kid": kid},
             retcols=cols,
         )

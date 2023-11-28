@@ -1,0 +1,1 @@
+ALTER TABLE siopv2_signing_rsa_key RENAME TO request_object_signing_rsa_key;
