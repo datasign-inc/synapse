@@ -1812,14 +1812,17 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
         if ret is None:
             return None
-        return ret["ro_nonce"]
+        (ro_nonce,) = ret
+        return ro_nonce
 
     async def lookup_rsa_key(self, kid: str) -> Optional[dict]:
-        return await self.db_pool.simple_select_one(
+        cols = ["kid", "kty", "n", "e", "d", "p", "q", "dp", "dq", "qi"]
+        ret = await self.db_pool.simple_select_one(
             table="siopv2_signing_rsa_key",
             keyvalues={"kid": kid},
-            retcols=["kid", "kty", "n", "e", "d", "p", "q", "dp", "dq", "qi"],
+            retcols=cols,
         )
+        return dict(zip(cols, ret))
 
     async def validate_siopv2_session(self, sid, expected_status) -> bool:
         # todo: Allow reference from other functions
@@ -1834,12 +1837,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             logger.info("siopv2_session_not_found sid=%s" % sid)
             return False
 
-        status = ret["status"]
+        status, created_ts = ret
         if status == "invalidated":
             logger.info("siopv2_session_invalidated sid=%s" % sid)
             return False
 
-        created_ts = ret["created_ts"]
         now = self._clock.time_msec()
         if created_ts + siopv2_session_timeout < now:
             logger.info("siopv2_session_timeout sid=%s" % sid)
@@ -1965,8 +1967,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"siopv2_sid": siopv2_sid},
             retcol="token",
         )
-        logger.info("return value from database : %s", value)
-        return value
+        (token,) = value
+        return token
 
     async def add_login_token_to_user(
         self,
