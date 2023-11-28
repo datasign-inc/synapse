@@ -53,7 +53,7 @@ from synapse.rest.client import (
     sendtodevice,
     siopv2_client_metadata,
     siopv2_jwks,
-    siopv2_login_token,
+    siopv2_polling,
     siopv2_request,
     siopv2_response,
     sync,
@@ -120,7 +120,7 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             siopv2_response.register_servlets(hs, client_resource)
             siopv2_request.register_servlets(hs, client_resource)
-            siopv2_login_token.register_servlets(hs, client_resource)
+            siopv2_polling.register_servlets(hs, client_resource)
             siopv2_client_metadata.register_servlets(hs, client_resource)
             siopv2_jwks.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
