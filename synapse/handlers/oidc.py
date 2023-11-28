@@ -232,6 +232,11 @@ class SIOPv2Handler:
     async def handle_siopv2_response(self, request: SynapseRequest, siopv2_sid: str):
         try:
             content_bytes = request.content.read()  # type: ignore
+            if (
+                request.requestHeaders.getRawHeaders("Content-Type")
+                != "application/x-www-form-urlencoded"
+            ):
+                raise Exception("Invalid content type")
         except Exception:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading content")
 
