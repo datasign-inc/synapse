@@ -754,7 +754,7 @@ class AuthHandler:
         base_url = self.hs.config.server.public_baseurl
 
         def add_sid(url, sid):
-            return add_query_param_to_url(url, "sv2sid", sid)
+            return "/".join([url, sid])
 
         # todo: fix hard-coding of paths
         redirect_uri = add_sid(
