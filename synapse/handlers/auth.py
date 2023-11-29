@@ -766,7 +766,7 @@ class AuthHandler:
         )
 
         polling_uri = add_sid(
-            urllib.parse.urljoin(base_url, "/_matrix/client/v3/loginToken_by_siopv2"),
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_polling"),
             sid,
         )
 

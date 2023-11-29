@@ -9,8 +9,8 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-class HandleSIOPv2LoginToken(RestServlet):
-    PATTERNS = client_patterns("/loginToken_by_siopv2$")
+class HandleSIOPv2Polling(RestServlet):
+    PATTERNS = client_patterns("/siopv2_polling$")
 
     def __init__(self, hs):
         super().__init__()
@@ -34,4 +34,4 @@ class HandleSIOPv2LoginToken(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    HandleSIOPv2LoginToken(hs).register(http_server)
+    HandleSIOPv2Polling(hs).register(http_server)

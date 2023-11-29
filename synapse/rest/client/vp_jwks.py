@@ -9,7 +9,7 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-class HandleVpJwksUri(RestServlet):
+class HandleVpJwks(RestServlet):
     PATTERNS = client_patterns("/vp_jwks$")
 
     def __init__(self, hs):
@@ -40,4 +40,4 @@ class HandleVpJwksUri(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    HandleVpJwksUri(hs).register(http_server)
+    HandleVpJwks(hs).register(http_server)

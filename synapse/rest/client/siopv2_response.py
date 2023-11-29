@@ -9,7 +9,7 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-class MyCustomEndpoint(RestServlet):
+class HandleSIOPv2Response(RestServlet):
     PATTERNS = client_patterns("/siopv2_response$")  # 新しいエンドポイントのパスを指定
 
     def __init__(self, hs):
@@ -42,4 +42,4 @@ class MyCustomEndpoint(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    MyCustomEndpoint(hs).register(http_server)
+    HandleSIOPv2Response(hs).register(http_server)
