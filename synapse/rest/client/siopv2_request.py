@@ -47,6 +47,7 @@ class HandleSIOPv2Request(RestServlet):
             else:
                 self.jwt_signing_key = JsonWebKey.import_key(key)
 
+        header = {"alg": "RS256", "kid": self.jwt_signing_key.kid}
         payload = {
             "iss": redirect_uri,
             "client_id": redirect_uri,
@@ -57,8 +58,7 @@ class HandleSIOPv2Request(RestServlet):
             "aud": "https://self-issued.me/v2",
         }
 
-        ro_jwt = jwt.encode({"alg": "RS256"}, payload, self.jwt_signing_key)
-
+        ro_jwt = jwt.encode(header, payload, self.jwt_signing_key)
         return 200, ro_jwt
 
 
