@@ -13,30 +13,81 @@ from synapse.util.stringutils import add_query_param_to_url
 logger = logging.getLogger(__name__)
 
 
-def make_input_descriptors(vp_type: str):
+def make_required_descriptors(vp_type: str):
     if vp_type == "ageOver13":
-        return [
+        descriptors = [
             {
-                "id": "age_over_13",
+                "group": "A",
+                "id": "identity_credential_based_on_myna",
                 "name": "年齢が13以上であることを確認します",
                 "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
-                "constraints": {"fields": [{"path": ["$.credentialSubject.isOver13"]}]},
-            }
-        ]
-    elif vp_type == "affiliation":
-        return [
-            {
-                "id": "affiliation",
-                "name": "所属情報を確認します",
-                "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
+                "format": {
+                    "vc+sd-jwt": {
+                        "alg": ["ES256", "ES256K"],
+                    }
+                },
                 "constraints": {
-                    "fields": [{"path": ["$.credentialSubject.affiliation"]}]
+                    "fields": [
+                        {
+                            # todo: Respect vc schema and Change to appropriate value
+                            "path": ["$.credentialSubject.isOver13"],
+                            "filter": {
+                                "type": "string",
+                                # todo: to be implemented. may be JSON Schema URL?
+                                "const": "",
+                            },
+                        }
+                    ],
+                    # This indicates that the Conformant Consumer MUST limit
+                    # submitted fields to those listed in the fields array
+                    "limit_disclosure,": "required",
                 },
             }
         ]
-    else:
-        # todo: raise an error
-        pass
+
+        # submission_requirements property defines which
+        # Input Descriptors are required for submission,
+        requirements = [
+            {"name": "Age over 13 years old", "rule": "pick", "count": 1, "from": "A"}
+        ]
+
+        return descriptors, requirements
+
+    if vp_type == "affiliation":
+        descriptors = [
+            {
+                "group": "A",
+                "id": "affiliation",
+                "name": "所属情報を確認します",
+                "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
+                "format": {
+                    "vc+sd-jwt": {
+                        "alg": ["ES256", "ES256K"],
+                    }
+                },
+                "constraints": {
+                    "fields": [
+                        {
+                            # todo: to be implemented. may be JSON Schema URL?
+                            "path": ["$.credentialSubject.affiliation"],
+                            "filter": {
+                                "type": "string",
+                                "const": "",  # todo: to be implemented
+                            },
+                        }
+                    ],
+                    "limit_disclosure,": "required",
+                },
+            }
+        ]
+
+        requirements = [
+            {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
+        ]
+
+        return descriptors, requirements
+
+    raise ValueError("unexpected vp_type %s" % vp_type)
 
 
 class HandleVpRequest(RestServlet):
@@ -80,21 +131,25 @@ class HandleVpRequest(RestServlet):
             vpsid,
         )
 
+        input_descriptors, requirements = make_required_descriptors(vp_type)
+
+        header = {"alg": "RS256", "kid": self.jwt_signing_key.kid}
         payload = {
             "client_id": client_id,
+            "client_id_scheme": "x509_san_dns",
             "response_uri": client_id,
             "nonce": ro_nonce,
             "response_mode": "direct_post",
             "response_type": "vp_token",
             "presentation_definition": {
                 "id": vpsid,
-                "input_descriptors": make_input_descriptors(vp_type),
+                "input_descriptors": input_descriptors,
+                "submission_requirements": requirements,
             },
             "client_metadata_uri": client_metadata_uri,
         }
 
-        ro_jwt = jwt.encode({"alg": "RS256"}, payload, self.jwt_signing_key)
-
+        ro_jwt = jwt.encode(header, payload, self.jwt_signing_key)
         return 200, ro_jwt
 
 
