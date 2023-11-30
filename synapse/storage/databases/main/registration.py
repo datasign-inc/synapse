@@ -13,12 +13,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 import random
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 import attr
+from authlib.jose import JsonWebKey, Key as JwkKey
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import (
@@ -1815,14 +1817,31 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         (ro_nonce,) = ret
         return ro_nonce
 
-    async def lookup_rsa_key(self, kid: str) -> Optional[dict]:
-        cols = ["kid", "kty", "n", "e", "d", "p", "q", "dp", "dq", "qi"]
+    async def lookup_ro_signing_key(self, kid: str) -> Optional[JwkKey]:
+        cols = ["kid", "jwk_json_string"]
+
         ret = await self.db_pool.simple_select_one(
-            table="request_object_signing_rsa_key",
+            table="request_object_signing_key",
             keyvalues={"kid": kid},
             retcols=cols,
         )
-        return dict(zip(cols, ret))
+
+        if ret is None:
+            return None
+
+        (_, jwk_json_string) = ret
+        k = JsonWebKey.import_key(json.loads(jwk_json_string))
+        return k
+
+    async def register_ro_signing_key(self, kid: str, jwk_json_string: str) -> None:
+        await self.db_pool.simple_insert(
+            table="request_object_signing_key",
+            values={
+                "kid": kid,
+                "jwk_json_string": jwk_json_string,
+            },
+            desc="create_ui_auth_session",
+        )
 
     async def validate_siopv2_session(self, sid, expected_status) -> bool:
         # todo: Allow reference from other functions

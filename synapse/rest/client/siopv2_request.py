@@ -2,7 +2,6 @@ import logging
 import urllib.parse
 from typing import Tuple
 
-from authlib.jose import JsonWebKey, jwt
 
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -21,6 +20,7 @@ class HandleSIOPv2Request(RestServlet):
         self.hs = hs
         self.store = hs.get_datastores().main
         self.jwt_signing_key = None
+        self._ro_signer = hs.get_oid4vc_request_object_signer()
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         if sid == "" or not await self.store.validate_siopv2_session(sid, "created"):
@@ -39,15 +39,8 @@ class HandleSIOPv2Request(RestServlet):
         else:
             nonce = issued_nonce
 
-        if self.jwt_signing_key is None:
-            key = await self.store.lookup_rsa_key("kid1")
-            if key is None:
-                pass
-                # todo: generate rsa key
-            else:
-                self.jwt_signing_key = JsonWebKey.import_key(key)
+        await self._ro_signer.setup_signing_key("kid1")
 
-        header = {"alg": "RS256", "kid": self.jwt_signing_key.kid}
         payload = {
             "iss": redirect_uri,
             "client_id": redirect_uri,
@@ -58,7 +51,8 @@ class HandleSIOPv2Request(RestServlet):
             "aud": "https://self-issued.me/v2",
         }
 
-        ro_jwt = jwt.encode(header, payload, self.jwt_signing_key)
+        ro_jwt = self._ro_signer.sign({}, payload)
+
         return 200, ro_jwt
 
 

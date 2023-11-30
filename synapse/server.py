@@ -141,6 +141,7 @@ from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.request_object_signer import OID4VCRequestObjectSigner
 from synapse.util.stringutils import random_string
 from synapse.util.task_scheduler import TaskScheduler
 
@@ -789,6 +790,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         from synapse.handlers.oidc import SIOPv2Handler
 
         return SIOPv2Handler(self)
+
+    @cache_in_self
+    def get_oid4_vc_request_object_signer(self) -> OID4VCRequestObjectSigner:
+        return OID4VCRequestObjectSigner(self)
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:

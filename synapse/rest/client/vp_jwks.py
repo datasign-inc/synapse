@@ -16,26 +16,12 @@ class HandleVpJwks(RestServlet):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
-        self.jwt_signing_key = None
+        self._ro_signer = hs.get_oid4vc_request_object_signer()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.jwt_signing_key is None:
-            key = await self.store.lookup_rsa_key("kid1")
-            if key is None:
-                # todo: generate rsa key
-                pass
+        await self._ro_signer.setup_signing_key("kid1")
 
-        # todo: Support for non-RSA keys
-        response_data = {
-            "keys": [
-                {
-                    "kty": key["kty"],
-                    "n": key["n"],
-                    "e": key["e"],
-                }
-            ]
-        }
-
+        response_data = {"keys": [self._ro_signer.as_dict()]}
         return 200, response_data
 
 

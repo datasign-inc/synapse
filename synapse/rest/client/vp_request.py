@@ -2,7 +2,6 @@ import logging
 import urllib.parse
 from typing import Tuple
 
-from authlib.jose import JsonWebKey, jwt
 
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -97,7 +96,7 @@ class HandleVpRequest(RestServlet):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
-        self.jwt_signing_key = None
+        self._ro_signer = hs.get_oid4vc_request_object_signer()
         self.base_url = self.hs.config.server.public_baseurl
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -112,13 +111,7 @@ class HandleVpRequest(RestServlet):
             vpsid,
         )
 
-        if self.jwt_signing_key is None:
-            key = await self.store.lookup_rsa_key("kid1")
-            if key is None:
-                pass
-                # todo: generate rsa key
-            else:
-                self.jwt_signing_key = JsonWebKey.import_key(key)
+        await self._ro_signer.setup_signing_key("kid1")
 
         vp_type = await self.store.lookup_vp_type(vpsid)
         ro_nonce = await self.store.lookup_vp_nonce(vpsid)
@@ -133,7 +126,6 @@ class HandleVpRequest(RestServlet):
 
         input_descriptors, requirements = make_required_descriptors(vp_type)
 
-        header = {"alg": "RS256", "kid": self.jwt_signing_key.kid}
         payload = {
             "client_id": client_id,
             "client_id_scheme": "x509_san_dns",
@@ -149,7 +141,7 @@ class HandleVpRequest(RestServlet):
             "client_metadata_uri": client_metadata_uri,
         }
 
-        ro_jwt = jwt.encode(header, payload, self.jwt_signing_key)
+        ro_jwt = self._ro_signer({}, payload)
         return 200, ro_jwt
 
 
