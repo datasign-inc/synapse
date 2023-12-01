@@ -306,7 +306,9 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.serve_server_wellknown = config.get("serve_server_wellknown", False)
-        self.request_object_signing_kid = config.get("request_object_signing_kid", "kid1")
+        self.request_object_signing_kid = config.get(
+            "request_object_signing_kid", "kid1"
+        )
 
         # Whether we should serve a "client well-known":
         #  (a) at .well-known/matrix/client on our client HTTP listener

@@ -1,4 +1,5 @@
 import logging
+
 from authlib.jose import JsonWebKey, Key as JwkKey, jwt
 
 logger = logging.getLogger(__name__)
