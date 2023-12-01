@@ -126,7 +126,7 @@ class JWKS(TypedDict):
     keys: List[JWK]
 
 
-def calculate_jwk_thumbprint(jwk_dict):
+def calculate_jwk_thumbprint(jwk_dict: dict) -> str:
     jwk_json = json.dumps(jwk_dict, sort_keys=True, separators=(",", ":"))
     logger.info(f"jwk_json for calculation : {jwk_json}")
     jwk_bytes = jwk_json.encode("utf-8")

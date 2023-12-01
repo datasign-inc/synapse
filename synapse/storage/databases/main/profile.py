@@ -244,13 +244,15 @@ class ProfileWorkerStore(SQLBaseStore):
         return ro_nonce
 
     async def lookup_vp_type(self, sid: str) -> Optional[str]:
-        ret = await self.db_pool.simple_select_one(
-            table="vp_session_management",
-            keyvalues={"sid": sid},
-            retcols=["vp_type"],
-        )
-        if ret is None:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["vp_type"],
+            )
+        except StoreError:
             return None
+
         (vp_type,) = ret
         return vp_type
 
@@ -261,12 +263,13 @@ class ProfileWorkerStore(SQLBaseStore):
         if sid == "":
             return False
 
-        ret = await self.db_pool.simple_select_one(
-            table="vp_session_management",
-            keyvalues={"sid": sid},
-            retcols=["status", "created_ts"],
-        )
-        if ret is None:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["status", "created_ts"],
+            )
+        except StoreError:
             return False
 
         status, created_ts = ret

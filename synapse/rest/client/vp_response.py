@@ -1,11 +1,15 @@
 import logging
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 from urllib.parse import parse_qs
 
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +17,7 @@ logger = logging.getLogger(__name__)
 class HandleVpResponse(RestServlet):
     PATTERNS = client_patterns("/vp_response/(?P<sid>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super().__init__()
         self.hs = hs
         self._siopv2_handler = hs.get_siopv2_handler()
@@ -39,5 +43,5 @@ class HandleVpResponse(RestServlet):
         return 200, {}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     HandleVpResponse(hs).register(http_server)

@@ -1,11 +1,15 @@
 import logging
 import urllib.parse
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +94,7 @@ def make_required_descriptors(vp_type: str):
 class HandleVpRequest(RestServlet):
     PATTERNS = client_patterns("/vp_request/(?P<sid>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
@@ -132,9 +136,9 @@ class HandleVpRequest(RestServlet):
             "client_metadata_uri": client_metadata_uri,
         }
 
-        ro_jwt = self._ro_signer({}, payload)
+        ro_jwt = self._ro_signer.sign({}, payload)
         return 200, ro_jwt
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     HandleVpRequest(hs).register(http_server)

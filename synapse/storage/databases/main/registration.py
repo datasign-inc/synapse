@@ -1791,14 +1791,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="mark_access_token_as_used",
         )
 
-    async def register_siopv2_session(self, sid: str):
+    async def register_siopv2_session(self, sid: str) -> None:
         created_ts = self._clock.time_msec()
         status = "created"
         await self.db_pool.simple_insert(
             "siopv2_session", {"sid": sid, "status": status, "created_ts": created_ts}
         )
 
-    async def register_siopv2_ro_nonce(self, sid: str, nonce: str):
+    async def register_siopv2_ro_nonce(self, sid: str, nonce: str) -> None:
         # todo: Use transaction
         await self.db_pool.simple_update_one(
             table="siopv2_session",

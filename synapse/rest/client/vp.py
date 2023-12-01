@@ -1,13 +1,17 @@
 import logging
 import urllib.parse
 from enum import Enum
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
 from synapse.util.stringutils import random_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +26,7 @@ class HandleVpInitiation(RestServlet):
         "/vp/(?P<vp_type>(%s))$" % "|".join([x.value for x in VPType])
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
@@ -31,7 +35,6 @@ class HandleVpInitiation(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, vp_type: str
     ) -> Tuple[int, JsonDict]:
-
         sid = random_string(32)
         ro_nonce = random_string(8)
         await self.store.register_vp_session(sid, vp_type, ro_nonce)
@@ -57,5 +60,5 @@ class HandleVpInitiation(RestServlet):
         return 200, response_data
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     HandleVpInitiation(hs).register(http_server)
