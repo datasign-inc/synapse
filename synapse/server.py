@@ -792,7 +792,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SIOPv2Handler(self)
 
     @cache_in_self
-    def get_oid4_vc_request_object_signer(self) -> OID4VCRequestObjectSigner:
+    def get_oid4vc_request_object_signer(self) -> OID4VCRequestObjectSigner:
         return OID4VCRequestObjectSigner(self)
 
     @cache_in_self
