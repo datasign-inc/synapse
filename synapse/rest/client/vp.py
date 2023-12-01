@@ -6,13 +6,13 @@ from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
-from synapse.util.stringutils import add_query_param_to_url, random_string
+from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
 
 
 class HandleVpInitiation(RestServlet):
-    PATTERNS = client_patterns("/vp$")
+    PATTERNS = client_patterns("/vp/(?P<vp_type>[^/]*)$")
 
     def __init__(self, hs):
         super().__init__()
@@ -20,37 +20,29 @@ class HandleVpInitiation(RestServlet):
         self.store = hs.get_datastores().main
         self.base_url = self.hs.config.server.public_baseurl
 
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        vp_type = request.args.get(b"type", [b""])[0].decode("utf-8")
-
+    async def on_GET(
+        self, request: SynapseRequest, vp_type: str
+    ) -> Tuple[int, JsonDict]:
         # todo: Make type_domain generally usable.
         type_domain = ("ageOver13", "affiliation")
 
-        if vp_type == "" or vp_type not in type_domain:
+        if vp_type not in type_domain:
             return 400, {"message": "Bad Request"}
 
-        vpsid = random_string(32)
+        sid = random_string(32)
         ro_nonce = random_string(8)
-        await self.store.start_vp_session(vpsid, vp_type, ro_nonce)
+        await self.store.start_vp_session(sid, vp_type, ro_nonce)
 
-        client_id = add_query_param_to_url(
-            urllib.parse.urljoin(self.base_url, "/_matrix/client/v3/vp_response"),
-            "vpsid",
-            vpsid,
+        client_id = urllib.parse.urljoin(
+            self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])
         )
 
-        request_uri = add_query_param_to_url(
-            urllib.parse.urljoin(self.base_url, "/_matrix/client/v3/vp_request"),
-            "vpsid",
-            vpsid,
+        request_uri = urllib.parse.urljoin(
+            self.base_url, "/".join(["/_matrix/client/v3/vp_request", sid])
         )
 
-        polling_uri = add_query_param_to_url(
-            urllib.parse.urljoin(
-                self.base_url, "/_matrix/client/v3/vp_check_completed"
-            ),
-            "vpsid",
-            vpsid,
+        polling_uri = urllib.parse.urljoin(
+            self.base_url, "/".join(["/_matrix/client/v3/vp_polling", sid])
         )
 
         response_data = {

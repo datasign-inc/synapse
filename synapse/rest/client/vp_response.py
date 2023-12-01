@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class HandleVpResponse(RestServlet):
-    PATTERNS = client_patterns("/vp_response$")  # 新しいエンドポイントのパスを指定
+    PATTERNS = client_patterns("/vp_response/(?P<sid>[^/]*)$")
 
     def __init__(self, hs):
         super().__init__()
@@ -19,10 +19,8 @@ class HandleVpResponse(RestServlet):
         self._siopv2_handler = hs.get_siopv2_handler()
         self.store = hs.get_datastores().main
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        vp_sid = request.args.get(b"vpsid", [b""])[0].decode("utf-8")
-
-        if not await self.store.validate_vp_session(vp_sid, "created"):
+    async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
+        if not await self.store.validate_vp_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
         try:

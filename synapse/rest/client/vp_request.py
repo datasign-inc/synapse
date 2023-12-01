@@ -6,7 +6,6 @@ from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
-from synapse.util.stringutils import add_query_param_to_url
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +88,7 @@ def make_required_descriptors(vp_type: str):
 
 
 class HandleVpRequest(RestServlet):
-    PATTERNS = client_patterns("/vp_request$")
+    PATTERNS = client_patterns("/vp_request/(?P<sid>[^/]*)$")
 
     def __init__(self, hs):
         super().__init__()
@@ -99,29 +98,21 @@ class HandleVpRequest(RestServlet):
         self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
         self.base_url = self.hs.config.server.public_baseurl
 
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        vpsid = request.args.get(b"vpsid", [b""])[0].decode("utf-8")
-
-        if not await self.store.validate_vp_session(vpsid, "created"):
+    async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
+        if not await self.store.validate_vp_session(sid, "created"):
             return 400, {"message": "Bad Request"}
-
-        client_id = add_query_param_to_url(
-            urllib.parse.urljoin(self.base_url, "/_matrix/client/v3/vp_response"),
-            "vpsid",
-            vpsid,
-        )
 
         await self._ro_signer.setup_signing_key(self.ro_signing_kid)
 
-        vp_type = await self.store.lookup_vp_type(vpsid)
-        ro_nonce = await self.store.lookup_vp_nonce(vpsid)
+        vp_type = await self.store.lookup_vp_type(sid)
+        ro_nonce = await self.store.lookup_vp_nonce(sid)
 
-        client_metadata_uri = add_query_param_to_url(
-            urllib.parse.urljoin(
-                self.base_url, "/_matrix/client/v3/vp_client_metadata"
-            ),
-            "vpsid",
-            vpsid,
+        client_id = urllib.parse.urljoin(
+            self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])
+        )
+
+        client_metadata_uri = urllib.parse.urljoin(
+            self.base_url, "/".join(["/_matrix/client/v3/vp_client_metadata", sid])
         )
 
         input_descriptors, requirements = make_required_descriptors(vp_type)
@@ -134,7 +125,7 @@ class HandleVpRequest(RestServlet):
             "response_mode": "direct_post",
             "response_type": "vp_token",
             "presentation_definition": {
-                "id": vpsid,
+                "id": sid,
                 "input_descriptors": input_descriptors,
                 "submission_requirements": requirements,
             },
