@@ -754,7 +754,7 @@ class AuthHandler:
         base_url = self.hs.config.server.public_baseurl
 
         def add_sid(url, sid):
-            return add_query_param_to_url(url, "sv2sid", sid)
+            return "/".join([url, sid])
 
         # todo: fix hard-coding of paths
         redirect_uri = add_sid(
@@ -766,7 +766,7 @@ class AuthHandler:
         )
 
         polling_uri = add_sid(
-            urllib.parse.urljoin(base_url, "/_matrix/client/v3/loginToken_by_siopv2"),
+            urllib.parse.urljoin(base_url, "/_matrix/client/v3/siopv2_polling"),
             sid,
         )
 

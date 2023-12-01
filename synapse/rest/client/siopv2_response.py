@@ -9,8 +9,8 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-class MyCustomEndpoint(RestServlet):
-    PATTERNS = client_patterns("/siopv2_response$")  # 新しいエンドポイントのパスを指定
+class HandleSIOPv2Response(RestServlet):
+    PATTERNS = client_patterns("/siopv2_response/(?P<sid>[^/]*)$")
 
     def __init__(self, hs):
         super().__init__()
@@ -18,7 +18,7 @@ class MyCustomEndpoint(RestServlet):
         self._siopv2_handler = hs.get_siopv2_handler()
         self.store = hs.get_datastores().main
 
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+    async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         # 応答データを作成
         response_data = {
             "message": "Success!!",
@@ -26,15 +26,11 @@ class MyCustomEndpoint(RestServlet):
 
         return 200, response_data  # 応答を返す
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        siopv2_sid = request.args.get(b"sv2sid", [b""])[0].decode("utf-8")
-
-        if siopv2_sid == "" or not await self.store.validate_siopv2_session(
-            siopv2_sid, "created"
-        ):
+    async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
+        if not await self.store.validate_siopv2_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
-        await self._siopv2_handler.handle_siopv2_response(request, siopv2_sid)
+        await self._siopv2_handler.handle_siopv2_response(request, sid)
 
         response_data = {"message": "New endpoint data received.", "data": ""}
 
@@ -42,4 +38,4 @@ class MyCustomEndpoint(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    MyCustomEndpoint(hs).register(http_server)
+    HandleSIOPv2Response(hs).register(http_server)

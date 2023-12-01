@@ -53,7 +53,7 @@ from synapse.rest.client import (
     sendtodevice,
     siopv2_client_metadata,
     siopv2_jwks,
-    siopv2_login_token,
+    siopv2_polling,
     siopv2_request,
     siopv2_response,
     sync,
@@ -63,6 +63,12 @@ from synapse.rest.client import (
     user_directory,
     versions,
     voip,
+    vp,
+    vp_client_metadata,
+    vp_jwks,
+    vp_polling,
+    vp_request,
+    vp_response,
 )
 
 if TYPE_CHECKING:
@@ -120,9 +126,16 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             siopv2_response.register_servlets(hs, client_resource)
             siopv2_request.register_servlets(hs, client_resource)
-            siopv2_login_token.register_servlets(hs, client_resource)
+            siopv2_polling.register_servlets(hs, client_resource)
             siopv2_client_metadata.register_servlets(hs, client_resource)
             siopv2_jwks.register_servlets(hs, client_resource)
+        if is_main_process:
+            vp.register_servlets(hs, client_resource)
+            vp_request.register_servlets(hs, client_resource)
+            vp_jwks.register_servlets(hs, client_resource)
+            vp_polling.register_servlets(hs, client_resource)
+            vp_response.register_servlets(hs, client_resource)
+            vp_client_metadata.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
         room_keys.register_servlets(hs, client_resource)
