@@ -27,8 +27,8 @@ def make_required_descriptors(vp_type: str):
                 "constraints": {
                     "fields": [
                         {
-                            # todo: Respect vc schema and Change to appropriate value
-                            "path": ["$.credentialSubject.isOver13"],
+                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/proxy-vci/src/vci/identityCredential.ts#L187
+                            "path": ["$.is_older_than_13"],
                             "filter": {
                                 "type": "string",
                                 # todo: to be implemented. may be JSON Schema URL?
@@ -66,8 +66,8 @@ def make_required_descriptors(vp_type: str):
                 "constraints": {
                     "fields": [
                         {
-                            # todo: to be implemented. may be JSON Schema URL?
-                            "path": ["$.credentialSubject.affiliation"],
+                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/employee-vci/src/vci/employeeCredential.ts#L50
+                            "path": ["$.division"],
                             "filter": {
                                 "type": "string",
                                 "const": "",  # todo: to be implemented
