@@ -12,10 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import binascii
+import hashlib
 import inspect
 import json
 import logging
+import urllib.parse
+from base64 import urlsafe_b64encode
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -27,13 +32,18 @@ from typing import (
     TypeVar,
     Union,
 )
-from urllib.parse import urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import attr
 import unpaddedbase64
 from authlib.common.security import generate_token
 from authlib.jose import JsonWebToken, JWTClaims
-from authlib.jose.errors import InvalidClaimError, JoseError, MissingClaimError
+from authlib.jose.errors import (
+    BadSignatureError,
+    InvalidClaimError,
+    JoseError,
+    MissingClaimError,
+)
 from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oauth2.rfc7636.challenge import create_s256_code_challenge
@@ -50,10 +60,11 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 from synapse.config import ConfigError
 from synapse.config.oidc import OidcProviderClientSecretJwtKey, OidcProviderConfig
 from synapse.handlers.sso import MappingException, UserAttributes
+from synapse.http import redact_uri
 from synapse.http.server import finish_request
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
@@ -62,6 +73,7 @@ from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 from synapse.util.macaroons import MacaroonGenerator, OidcSessionData
+from synapse.util.stringutils import add_query_param_to_url
 from synapse.util.templates import _localpart_from_email_filter
 
 if TYPE_CHECKING:
@@ -112,6 +124,171 @@ C = TypeVar("C")
 #: A JWK Set, as per RFC7517 sec 5.
 class JWKS(TypedDict):
     keys: List[JWK]
+
+
+def calculate_jwk_thumbprint(jwk_dict):
+    jwk_json = json.dumps(jwk_dict, sort_keys=True, separators=(",", ":"))
+    logger.info(f"jwk_json for calculation : {jwk_json}")
+    jwk_bytes = jwk_json.encode("utf-8")
+    sha256_hash = hashlib.sha256(jwk_bytes).digest()
+    thumbprint = urlsafe_b64encode(sha256_hash).rstrip(b"=").decode("utf-8")
+    return thumbprint
+
+
+def to_unicode(s):
+    try:
+        return s.decode("utf-8")
+    except (UnicodeDecodeError, AttributeError):
+        return str(s)
+
+
+class SIOPv2Handler:
+    def __init__(self, hs: "HomeServer"):
+        self.base_url = hs.config.server.public_baseurl
+        self._clock = hs.get_clock()
+
+        # providers を取得するために、OidcHandlerを取得している。
+        # OidcHandlerを経由せずに、直接providersを取得する方法がうまく行かないため
+        self._store = hs.get_datastores().main
+        self._oidc_handler = hs.get_oidc_handler()
+        self._providers = self._oidc_handler._providers
+
+    async def _verify_siopv2_id_token(
+        self, token: str, expected_nonce: str, expected_aud: str
+    ):
+        logger.info(type(token))
+        logger.info(f"verifying siopv2 id token : {token}")
+
+        id_token = to_unicode(token)
+        jwt_parts = id_token.split(".")
+        if len(jwt_parts) != 3:
+            logger.info("Invalid ID Token format")
+            return
+
+        header, payload, signature = jwt_parts
+
+        header_data = json.loads(
+            base64.urlsafe_b64decode(header + "==").decode("utf-8")
+        )
+        payload_data = json.loads(
+            base64.urlsafe_b64decode(payload + "==").decode("utf-8")
+        )
+
+        sub = payload_data.get("sub")
+        sub_type_did = sub.startswith("did:")
+
+        if sub_type_did:
+            # todo: support did
+            return
+        else:
+            if payload_data.get("nonce") != expected_nonce:
+                logger.info("Invalid nonce")
+                return
+
+            if payload_data.get("iss") != payload_data.get("sub"):
+                logger.info("ID Token is not self-issued")
+                return
+
+            if payload_data.get("aud") != expected_aud:
+                logger.info("Invalid audience")
+                return
+
+            sub_jwk = payload_data.get("sub_jwk")
+
+            if not sub_jwk:
+                logger.info("sub_jwk is missing")
+                return
+
+            jwk_thumbprint = calculate_jwk_thumbprint(sub_jwk)
+
+            if sub != jwk_thumbprint:
+                logger.info(f"Invalid sub value : {sub} != {jwk_thumbprint}")
+                return
+
+            jwt = JsonWebToken(["RS256", "ES256K"])
+            logger.info(f"public key : {sub_jwk}")
+            try:
+                claims = jwt.decode(id_token, key=sub_jwk, claims_cls=CodeIDToken)
+            except BadSignatureError as e:
+                logger.info(f"Signature verification failed: {e}")
+                return
+
+        claims.validate(now=self._clock.time(), leeway=120)
+
+        return claims  # 検証が成功した場合、クレームを返す
+
+    async def _verify_token(
+        self, request: SynapseRequest, token: Token, nonce: str, aud: str
+    ):
+        jwt = token.get("id_token")
+        claims = await self._verify_siopv2_id_token(jwt, nonce, aud)
+        if claims is None:
+            raise Exception(f"Invalid token {token}")
+
+        userinfo = UserInfo(claims)
+        logger.info("converted to userinfo : %s", userinfo)
+        return userinfo
+
+    async def handle_siopv2_response(self, request: SynapseRequest, siopv2_sid: str):
+        try:
+            content_bytes = request.content.read()  # type: ignore
+            if (
+                request.requestHeaders.getRawHeaders("Content-Type")
+                != "application/x-www-form-urlencoded"
+            ):
+                raise Exception("Invalid content type")
+        except Exception:
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading content")
+
+        try:
+            content = parse_qs(content_bytes.decode("utf-8"))
+            id_token = content.get("id_token", None)
+
+            if id_token is None or len(id_token) != 1:
+                raise Exception("id_token not found")
+
+            token = Token(id_token=id_token[0])
+            expected_nonce = await self._store.lookup_ro_nonce(siopv2_sid)
+
+            logger.info("making expected aud")
+            expected_aud = add_query_param_to_url(
+                # todo: Fix hard coding
+                urllib.parse.urljoin(
+                    self.base_url, "/_matrix/client/v3/siopv2_response"
+                ),
+                "sv2sid",
+                siopv2_sid,
+            )
+            logger.info("creation ok")
+
+            userinfo = await self._verify_token(
+                request, token, expected_nonce, expected_aud
+            )
+
+            logger.info("userinfo returned %s", userinfo)
+
+            await self._store.update_siopv2_session_status(siopv2_sid, "posted")
+
+            # todo: Correct to appropriate value
+            provider = self._providers.get("oidc-github")
+
+            await provider._complete_oidc_login(
+                userinfo, token, request, "", "", siopv2_sid=siopv2_sid
+            )
+
+        except Exception as e:
+            logger.warning(
+                "Unable to parse x-www-form-urlencoded from %s %s response: %s (%s)",
+                request.method.decode("ascii", errors="replace"),
+                redact_uri(request.uri.decode("ascii", errors="replace")),
+                e,
+                content_bytes,
+            )
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Content not JSON.",
+                errcode=Codes.BAD_SIOPv2_RESPONSE,
+            )
 
 
 class OidcHandler:
@@ -1126,6 +1303,7 @@ class OidcProvider:
         request: SynapseRequest,
         client_redirect_url: str,
         sid: Optional[str],
+        siopv2_sid: Optional[str] = None,
     ) -> None:
         """Given a UserInfo response, complete the login flow
 
@@ -1240,6 +1418,7 @@ class OidcProvider:
             extra_attributes,
             auth_provider_session_id=sid,
             registration_enabled=self._config.enable_registration,
+            siopv2_sid=siopv2_sid,
         )
 
     def _remote_id_from_userinfo(self, userinfo: UserInfo) -> str:
@@ -1656,6 +1835,8 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             # Append suffix integer if last call to this function failed to produce
             # a usable mxid.
             localpart += str(failures) if failures else ""
+        else:
+            logger.info("localpart_template not set")
 
         def render_template_field(template: Optional[Template]) -> Optional[str]:
             if template is None:

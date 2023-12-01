@@ -144,6 +144,9 @@ class LoginRestServlet(RestServlet):
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
+        if True:
+            flows.append({"type": "m.login.siopv2"})
+
         # The login token flow requires m.login.token to be advertised.
         support_login_token_flow = self._get_login_token_enabled
 

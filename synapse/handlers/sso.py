@@ -386,6 +386,7 @@ class SsoHandler:
         extra_login_attributes: Optional[JsonDict] = None,
         auth_provider_session_id: Optional[str] = None,
         registration_enabled: bool = True,
+        siopv2_sid: Optional[str] = None,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -529,6 +530,7 @@ class SsoHandler:
             extra_login_attributes,
             new_user=new_user,
             auth_provider_session_id=auth_provider_session_id,
+            siopv2_sid=siopv2_sid,
         )
 
     async def _call_attribute_mapper(

@@ -982,6 +982,7 @@ def _calculate_registration_flows(
         # complete one of the flows with email/msisdn auth.
         flows.append([LoginType.DUMMY])
 
+    flows.append([LoginType.SIOPv2])
     # only support the email-only flow if we don't require MSISDN 3PIDs
     if show_email and not require_msisdn:
         flows.append([LoginType.EMAIL_IDENTITY])

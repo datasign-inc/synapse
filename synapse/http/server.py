@@ -783,7 +783,14 @@ def respond_with_json(
     else:
         encoder = _encode_json_bytes
 
-    request.setHeader(b"Content-Type", b"application/json")
+    # todo: Implement a standard mechanism that can respond to non-JSON
+    if request.path.startswith(
+        (b"/_matrix/client/v3/siopv2_request", b"/_matrix/client/v3/vp_request")
+    ) and isinstance(json_object, bytes):
+        request.setHeader(b"Content-Type", b"application/oauth-authz-req+jwt")
+    else:
+        request.setHeader(b"Content-Type", b"application/json")
+
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
     if send_cors:
@@ -860,9 +867,14 @@ async def _async_write_json_to_request_in_thread(
             opentracing_span.log_kv({"event": "encoded"})
         return res
 
-    with start_active_span("encode_json_response"):
-        span = active_span()
-        json_str = await defer_to_thread(request.reactor, encode, span)
+    if request.path.startswith(
+        (b"/_matrix/client/v3/siopv2_request", b"/_matrix/client/v3/vp_request")
+    ) and isinstance(json_object, bytes):
+        json_str = json_object
+    else:
+        with start_active_span("encode_json_response"):
+            span = active_span()
+            json_str = await defer_to_thread(request.reactor, encode, span)
 
     _write_bytes_to_request(request, json_str)
 

@@ -76,6 +76,16 @@ class DummyAuthChecker(UserInteractiveAuthChecker):
         return True
 
 
+class SIOPv2AuthChecker(UserInteractiveAuthChecker):
+    AUTH_TYPE = LoginType.SIOPv2
+
+    def is_enabled(self) -> bool:
+        return True
+
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
+        return True
+
+
 class TermsAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.TERMS
 
@@ -321,5 +331,6 @@ INTERACTIVE_AUTH_CHECKERS: Sequence[Type[UserInteractiveAuthChecker]] = [
     EmailIdentityAuthChecker,
     MsisdnAuthChecker,
     RegistrationTokenAuthChecker,
+    SIOPv2AuthChecker,
 ]
 """A list of UserInteractiveAuthChecker classes"""
