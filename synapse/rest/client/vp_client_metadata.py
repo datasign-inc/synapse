@@ -18,6 +18,7 @@ class HandleVpClientMetadata(RestServlet):
         self.hs = hs
         self.store = hs.get_datastores().main
         self._ro_signer = hs.get_oid4vc_request_object_signer()
+        self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         vp_sid = request.args.get(b"vpsid", [b""])[0].decode("utf-8")
@@ -25,7 +26,7 @@ class HandleVpClientMetadata(RestServlet):
         if not await self.store.validate_vp_session(vp_sid, "created"):
             return 400, {"message": "Bad Request"}
 
-        await self._ro_signer.setup_signing_key("kid1")
+        await self._ro_signer.setup_signing_key(self.ro_signing_kid)
         base_url = self.hs.config.server.public_baseurl
 
         response_data = {

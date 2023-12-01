@@ -17,9 +17,10 @@ class HandleVpJwks(RestServlet):
         self.hs = hs
         self.store = hs.get_datastores().main
         self._ro_signer = hs.get_oid4vc_request_object_signer()
+        self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        await self._ro_signer.setup_signing_key("kid1")
+        await self._ro_signer.setup_signing_key(self.ro_signing_kid)
 
         response_data = {"keys": [self._ro_signer.as_dict()]}
         return 200, response_data

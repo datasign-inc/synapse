@@ -96,6 +96,7 @@ class HandleVpRequest(RestServlet):
         self.hs = hs
         self.store = hs.get_datastores().main
         self._ro_signer = hs.get_oid4vc_request_object_signer()
+        self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
         self.base_url = self.hs.config.server.public_baseurl
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -110,7 +111,7 @@ class HandleVpRequest(RestServlet):
             vpsid,
         )
 
-        await self._ro_signer.setup_signing_key("kid1")
+        await self._ro_signer.setup_signing_key(self.ro_signing_kid)
 
         vp_type = await self.store.lookup_vp_type(vpsid)
         ro_nonce = await self.store.lookup_vp_nonce(vpsid)

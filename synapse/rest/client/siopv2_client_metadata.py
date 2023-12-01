@@ -18,12 +18,13 @@ class HandleSIOPv2ClientMetadata(RestServlet):
         self.hs = hs
         self.store = hs.get_datastores().main
         self._ro_signer = hs.get_oid4vc_request_object_signer()
+        self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         if not await self.store.validate_siopv2_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
-        await self._ro_signer.setup_signing_key("kid1")
+        await self._ro_signer.setup_signing_key(self.ro_signing_kid)
         base_url = self.hs.config.server.public_baseurl
 
         response_data = {
