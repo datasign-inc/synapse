@@ -26,6 +26,8 @@ from synapse.types import JsonDict, UserID
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.api.errors import StoreError
+
 
 class ProfileWorkerStore(SQLBaseStore):
     def __init__(
@@ -216,26 +218,27 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="set_profile_avatar_url",
         )
 
-    async def start_vp_session(self, vpsid: str, vp_type: str, ro_nonce: str) -> None:
+    async def register_vp_session(self, sid: str, vp_type: str, ro_nonce: str) -> None:
         await self.db_pool.simple_insert(
             table="vp_session_management",
             values={
-                "sid": vpsid,
+                "sid": sid,
                 "vp_type": vp_type,
                 "status": "created",
                 "ro_nonce": ro_nonce,
                 "created_ts": self._clock.time_msec(),
             },
-            desc="start_vp_session",
+            desc="register_vp_session",
         )
 
-    async def lookup_vp_nonce(self, sid) -> Optional[str]:
-        ret = await self.db_pool.simple_select_one(
-            table="vp_session_management",
-            keyvalues={"sid": sid},
-            retcols=["ro_nonce"],
-        )
-        if ret is None:
+    async def lookup_vp_ro_nonce(self, sid) -> Optional[str]:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["ro_nonce"],
+            )
+        except StoreError:
             return None
         (ro_nonce,) = ret
         return ro_nonce

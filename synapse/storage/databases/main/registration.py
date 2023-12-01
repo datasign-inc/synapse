@@ -1798,7 +1798,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "siopv2_session", {"sid": sid, "status": status, "created_ts": created_ts}
         )
 
-    async def register_ro_nonce(self, sid, nonce):
+    async def register_siopv2_ro_nonce(self, sid, nonce):
         # todo: Use transaction
         await self.db_pool.simple_update_one(
             table="siopv2_session",
@@ -1806,7 +1806,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             updatevalues={"ro_nonce": nonce},
         )
 
-    async def lookup_ro_nonce(self, sid) -> Optional[str]:
+    async def lookup_siopv2_ro_nonce(self, sid) -> Optional[str]:
         try:
             ret = await self.db_pool.simple_select_one(
                 table="siopv2_session",

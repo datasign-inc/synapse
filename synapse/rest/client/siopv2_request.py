@@ -31,10 +31,10 @@ class HandleSIOPv2Request(RestServlet):
             base_url, "/".join(["/_matrix/client/v3/siopv2_response", sid])
         )
 
-        issued_nonce = await self.store.lookup_ro_nonce(sid)
+        issued_nonce = await self.store.lookup_siopv2_ro_nonce(sid)
         if issued_nonce is None or issued_nonce == "":
             nonce = random_string(8)
-            await self.store.register_ro_nonce(sid, nonce)
+            await self.store.register_siopv2_ro_nonce(sid, nonce)
         else:
             nonce = issued_nonce
 

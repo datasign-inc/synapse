@@ -105,7 +105,7 @@ class HandleVpRequest(RestServlet):
         await self._ro_signer.setup_signing_key(self.ro_signing_kid)
 
         vp_type = await self.store.lookup_vp_type(sid)
-        ro_nonce = await self.store.lookup_vp_nonce(sid)
+        ro_nonce = await self.store.lookup_vp_ro_nonce(sid)
 
         client_id = urllib.parse.urljoin(
             self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])

@@ -248,7 +248,7 @@ class SIOPv2Handler:
                 raise Exception("id_token not found")
 
             token = Token(id_token=id_token[0])
-            expected_nonce = await self._store.lookup_ro_nonce(siopv2_sid)
+            expected_nonce = await self._store.lookup_siopv2_ro_nonce(siopv2_sid)
 
             logger.info("making expected aud")
             expected_aud = add_query_param_to_url(
