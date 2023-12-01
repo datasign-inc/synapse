@@ -1,4 +1,7 @@
+import logging
 from authlib.jose import JsonWebKey, Key as JwkKey, jwt
+
+logger = logging.getLogger(__name__)
 
 
 class OID4VCRequestObjectSigner:
@@ -22,7 +25,7 @@ class OID4VCRequestObjectSigner:
         self._kid = kid
         self.__signing_key = signing_key
 
-    async def sign(self, header: dict, payload: dict) -> str:
+    def sign(self, header: dict, payload: dict) -> str:
         return jwt.encode(
             {"kid": self._kid, "alg": self.decide_alg(), **header},
             payload,
@@ -33,18 +36,19 @@ class OID4VCRequestObjectSigner:
         return self.__signing_key.as_dict()
 
     def decide_alg(self) -> str:
-        kty = self.__signing_key.kty
+        jwk = self.__signing_key.as_dict()
+        kty = jwk["kty"]
 
         if kty == "RSA":
             return "RS256"
 
         if kty == "EC":
-            crv = self.__signing_key.crv
+            crv = jwk["crv"]
             if crv == "P-256":
                 return "ES256"
 
         if kty == "OKP":
-            crv = self.__signing_key.crv
+            crv = jwk["crv"]
             if crv == "Ed25519":
                 return "EdDSA"
 
