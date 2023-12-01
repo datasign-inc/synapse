@@ -231,7 +231,7 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="register_vp_session",
         )
 
-    async def lookup_vp_ro_nonce(self, sid) -> Optional[str]:
+    async def lookup_vp_ro_nonce(self, sid: str) -> Optional[str]:
         try:
             ret = await self.db_pool.simple_select_one(
                 table="vp_session_management",
@@ -243,7 +243,7 @@ class ProfileWorkerStore(SQLBaseStore):
         (ro_nonce,) = ret
         return ro_nonce
 
-    async def lookup_vp_type(self, sid) -> Optional[str]:
+    async def lookup_vp_type(self, sid: str) -> Optional[str]:
         ret = await self.db_pool.simple_select_one(
             table="vp_session_management",
             keyvalues={"sid": sid},
@@ -254,7 +254,7 @@ class ProfileWorkerStore(SQLBaseStore):
         (vp_type,) = ret
         return vp_type
 
-    async def validate_vp_session(self, sid, expected_status) -> bool:
+    async def validate_vp_session(self, sid: str, expected_status: str) -> bool:
         # todo: Allow reference from other functions
         vp_session_timeout = 300000
 

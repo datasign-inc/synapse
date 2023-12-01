@@ -1791,14 +1791,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="mark_access_token_as_used",
         )
 
-    async def register_siopv2_session(self, sid):
+    async def register_siopv2_session(self, sid: str):
         created_ts = self._clock.time_msec()
         status = "created"
         await self.db_pool.simple_insert(
             "siopv2_session", {"sid": sid, "status": status, "created_ts": created_ts}
         )
 
-    async def register_siopv2_ro_nonce(self, sid, nonce):
+    async def register_siopv2_ro_nonce(self, sid: str, nonce: str):
         # todo: Use transaction
         await self.db_pool.simple_update_one(
             table="siopv2_session",
@@ -1806,7 +1806,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             updatevalues={"ro_nonce": nonce},
         )
 
-    async def lookup_siopv2_ro_nonce(self, sid) -> Optional[str]:
+    async def lookup_siopv2_ro_nonce(self, sid: str) -> Optional[str]:
         try:
             ret = await self.db_pool.simple_select_one(
                 table="siopv2_session",
@@ -1844,7 +1844,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="create_ui_auth_session",
         )
 
-    async def validate_siopv2_session(self, sid, expected_status) -> bool:
+    async def validate_siopv2_session(self, sid: str, expected_status: str) -> bool:
         # todo: Allow reference from other functions
         siopv2_session_timeout = 300000
 
@@ -1880,7 +1880,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             updatevalues={"status": status},
         )
 
-    async def invalidate_siopv2_session(self, sid) -> None:
+    async def invalidate_siopv2_session(self, sid: str) -> None:
         await self.update_siopv2_session_status(sid, "invalidated")
 
     async def lookup_refresh_token(
