@@ -17,11 +17,13 @@ class HandleSIOPv2ClientMetadata(RestServlet):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
+        self._ro_signer = hs.get_oid4vc_request_object_signer()
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         if sid == "" or not await self.store.validate_siopv2_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
+        await self._ro_signer.setup_signing_key("kid1")
         base_url = self.hs.config.server.public_baseurl
 
         response_data = {
@@ -33,7 +35,7 @@ class HandleSIOPv2ClientMetadata(RestServlet):
             "jwks_uri": urllib.parse.urljoin(
                 base_url, "/_matrix/client/v3/siopv2_jwks"
             ),
-            "request_object_signing_alg": "RS256",
+            "request_object_signing_alg": self._ro_signer.decide_alg(),
         }
 
         return 200, response_data

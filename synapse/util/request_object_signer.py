@@ -24,7 +24,7 @@ class OID4VCRequestObjectSigner:
 
     async def sign(self, header: dict, payload: dict) -> str:
         return jwt.encode(
-            {"kid": self._kid, "alg": self._decide_alg(), **header},
+            {"kid": self._kid, "alg": self.decide_alg(), **header},
             payload,
             self.__signing_key,
         )
@@ -32,7 +32,7 @@ class OID4VCRequestObjectSigner:
     def as_dict(self) -> dict:
         return self.__signing_key.as_dict()
 
-    def _decide_alg(self) -> str:
+    def decide_alg(self) -> str:
         kty = self.__signing_key.kty
 
         if kty == "RSA":
