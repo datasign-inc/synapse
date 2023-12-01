@@ -1,5 +1,6 @@
 import logging
 import urllib.parse
+from enum import Enum
 from typing import Tuple
 
 from synapse.http.servlet import RestServlet
@@ -11,8 +12,15 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 
+class VPType(Enum):
+    AGE_OVER_13 = "ageOver13"
+    AFFILIATION = "affiliation"
+
+
 class HandleVpInitiation(RestServlet):
-    PATTERNS = client_patterns("/vp/(?P<vp_type>[^/]*)$")
+    PATTERNS = client_patterns(
+        "/vp/(?P<vp_type>(%s))$" % "|".join([x.value for x in VPType])
+    )
 
     def __init__(self, hs):
         super().__init__()
@@ -23,11 +31,6 @@ class HandleVpInitiation(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, vp_type: str
     ) -> Tuple[int, JsonDict]:
-        # todo: Make type_domain generally usable.
-        type_domain = ("ageOver13", "affiliation")
-
-        if vp_type not in type_domain:
-            return 400, {"message": "Bad Request"}
 
         sid = random_string(32)
         ro_nonce = random_string(8)
