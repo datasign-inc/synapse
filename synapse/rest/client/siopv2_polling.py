@@ -22,8 +22,10 @@ class HandleSIOPv2Polling(RestServlet):
             return 400, {"message": "Bad Request"}
 
         value = await self.store.get_login_token_for_siopv2_sid(sid)
-        await self.store.invalidate_siopv2_session(sid)
+        if value is None:
+            return 400, {"message": "Bad Request"}
 
+        await self.store.invalidate_siopv2_session(sid)
         response_data = {"siopv2_sid": sid, "login_token": value}
 
         return 200, response_data

@@ -1807,12 +1807,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def lookup_ro_nonce(self, sid) -> Optional[str]:
-        ret = await self.db_pool.simple_select_one(
-            table="siopv2_session",
-            keyvalues={"sid": sid},
-            retcols=["ro_nonce"],
-        )
-        if ret is None:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="siopv2_session",
+                keyvalues={"sid": sid},
+                retcols=["ro_nonce"],
+            )
+        except StoreError:
             return None
         (ro_nonce,) = ret
         return ro_nonce
@@ -1820,13 +1821,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     async def lookup_ro_signing_key(self, kid: str) -> Optional[JwkKey]:
         cols = ["kid", "jwk_json_string"]
 
-        ret = await self.db_pool.simple_select_one(
-            table="request_object_signing_key",
-            keyvalues={"kid": kid},
-            retcols=cols,
-        )
-
-        if ret is None:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="request_object_signing_key",
+                keyvalues={"kid": kid},
+                retcols=cols,
+            )
+        except StoreError:
             return None
 
         (_, jwk_json_string) = ret
@@ -1850,13 +1851,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         if sid == "":
             return False
 
-        ret = await self.db_pool.simple_select_one(
-            table="siopv2_session",
-            keyvalues={"sid": sid},
-            retcols=["status", "created_ts"],
-        )
-        if ret is None:
-            logger.info("siopv2_session_not_found sid=%s" % sid)
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="siopv2_session",
+                keyvalues={"sid": sid},
+                retcols=["status", "created_ts"],
+            )
+        except StoreError:
             return False
 
         status, created_ts = ret
@@ -1983,12 +1984,16 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "replace_refresh_token", _replace_refresh_token_txn
         )
 
-    async def get_login_token_for_siopv2_sid(self, siopv2_sid: str) -> str:
-        value = await self.db_pool.simple_select_one_onecol(
-            table="login_tokens",
-            keyvalues={"siopv2_sid": siopv2_sid},
-            retcol="token",
-        )
+    async def get_login_token_for_siopv2_sid(self, siopv2_sid: str) -> Optional[str]:
+        try:
+            value = await self.db_pool.simple_select_one_onecol(
+                table="login_tokens",
+                keyvalues={"siopv2_sid": siopv2_sid},
+                retcol="token",
+            )
+        except StoreError:
+            return None
+
         (token,) = value
         return token
 
