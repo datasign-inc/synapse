@@ -20,7 +20,7 @@ class HandleSIOPv2ClientMetadata(RestServlet):
         self._ro_signer = hs.get_oid4vc_request_object_signer()
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if sid == "" or not await self.store.validate_siopv2_session(sid, "created"):
+        if not await self.store.validate_siopv2_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
         await self._ro_signer.setup_signing_key("kid1")

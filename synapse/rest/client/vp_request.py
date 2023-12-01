@@ -101,7 +101,7 @@ class HandleVpRequest(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         vpsid = request.args.get(b"vpsid", [b""])[0].decode("utf-8")
 
-        if vpsid == "" or not await self.store.validate_vp_session(vpsid, "created"):
+        if not await self.store.validate_vp_session(vpsid, "created"):
             return 400, {"message": "Bad Request"}
 
         client_id = add_query_param_to_url(

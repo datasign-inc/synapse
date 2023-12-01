@@ -1847,6 +1847,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         # todo: Allow reference from other functions
         siopv2_session_timeout = 300000
 
+        if sid == "":
+            return False
+
         ret = await self.db_pool.simple_select_one(
             table="siopv2_session",
             keyvalues={"sid": sid},

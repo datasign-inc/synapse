@@ -255,6 +255,9 @@ class ProfileWorkerStore(SQLBaseStore):
         # todo: Allow reference from other functions
         vp_session_timeout = 300000
 
+        if sid == "":
+            return False
+
         ret = await self.db_pool.simple_select_one(
             table="vp_session_management",
             keyvalues={"sid": sid},

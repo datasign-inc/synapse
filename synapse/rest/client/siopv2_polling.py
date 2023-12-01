@@ -18,7 +18,7 @@ class HandleSIOPv2Polling(RestServlet):
         self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if sid == "" or not await self.store.validate_siopv2_session(sid, "posted"):
+        if not await self.store.validate_siopv2_session(sid, "posted"):
             return 400, {"message": "Bad Request"}
 
         value = await self.store.get_login_token_for_siopv2_sid(sid)

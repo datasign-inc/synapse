@@ -27,7 +27,7 @@ class HandleSIOPv2Response(RestServlet):
         return 200, response_data  # 応答を返す
 
     async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if sid == "" or not await self.store.validate_siopv2_session(sid, "created"):
+        if not await self.store.validate_siopv2_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
         await self._siopv2_handler.handle_siopv2_response(request, sid)

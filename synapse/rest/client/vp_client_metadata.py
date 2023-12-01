@@ -22,7 +22,7 @@ class HandleVpClientMetadata(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         vp_sid = request.args.get(b"vpsid", [b""])[0].decode("utf-8")
 
-        if vp_sid == "" or not await self.store.validate_vp_session(vp_sid, "created"):
+        if not await self.store.validate_vp_session(vp_sid, "created"):
             return 400, {"message": "Bad Request"}
 
         await self._ro_signer.setup_signing_key("kid1")

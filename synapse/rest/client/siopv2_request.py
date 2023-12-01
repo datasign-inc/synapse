@@ -22,7 +22,7 @@ class HandleSIOPv2Request(RestServlet):
         self._ro_signer = hs.get_oid4vc_request_object_signer()
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if sid == "" or not await self.store.validate_siopv2_session(sid, "created"):
+        if not await self.store.validate_siopv2_session(sid, "created"):
             return 400, {"message": "Bad Request"}
 
         base_url = self.hs.config.server.public_baseurl
