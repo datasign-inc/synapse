@@ -2,7 +2,6 @@ import logging
 import urllib.parse
 from typing import Tuple
 
-
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
