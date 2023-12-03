@@ -251,14 +251,13 @@ class SIOPv2Handler:
             expected_nonce = await self._store.lookup_siopv2_ro_nonce(siopv2_sid)
 
             logger.info("making expected aud")
-            expected_aud = add_query_param_to_url(
-                # todo: Fix hard coding
+            expected_aud = "/".join([
                 urllib.parse.urljoin(
+                    # todo: Fix hard coding
                     self.base_url, "/_matrix/client/v3/siopv2_response"
                 ),
-                "sv2sid",
-                siopv2_sid,
-            )
+                siopv2_sid
+            ])
             logger.info("creation ok")
 
             userinfo = await self._verify_token(
