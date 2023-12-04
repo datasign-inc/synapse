@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Optional
+import json
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from synapse.api.constants import VPSessionStatus, VPType
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -22,7 +24,6 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, UserID
-from synapse.api.constants import VPType
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -219,7 +220,9 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="set_profile_avatar_url",
         )
 
-    async def register_vp_session(self, sid: str, vp_type: VPType, ro_nonce: str) -> None:
+    async def register_vp_session(
+        self, sid: str, vp_type: VPType, ro_nonce: str
+    ) -> None:
         await self.db_pool.simple_insert(
             table="vp_session_management",
             values={
@@ -232,6 +235,32 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="register_vp_session",
         )
 
+    async def register_vp_data(
+        self, user_id: str, vp_type: VPType, verified_claims: dict, raw_vp_token: str
+    ) -> None:
+        await self.db_pool.simple_insert(
+            table="user_vp_data",
+            values={
+                "user_id": user_id,
+                "vp_type": vp_type.value,
+                "verified_claims": json.dumps(verified_claims),
+                "raw_vp_token": raw_vp_token,
+                "created_ts": self._clock.time_msec(),
+            },
+            desc="register_user_vp_data",
+        )
+
+    async def lookup_vp_data(
+        self, user_id: str, vp_type: VPType
+    ) -> List[Tuple[dict, str]]:
+        ret = await self.db_pool.simple_select_list(
+            "user_vp_data",
+            keyvalues={"user_id": user_id, "vp_type": vp_type.value},
+            retcols=["verified_claims", "raw_vp_token"],
+            desc="lookup_vp_data",
+        )
+        return [(json.loads(x[0]), x[1]) for x in ret]
+
     async def lookup_vp_ro_nonce(self, sid: str) -> Optional[str]:
         try:
             ret = await self.db_pool.simple_select_one(
@@ -243,6 +272,17 @@ class ProfileWorkerStore(SQLBaseStore):
             return None
         (ro_nonce,) = ret
         return ro_nonce
+
+    async def update_vp_session_status(self, sid: str, status: VPSessionStatus) -> None:
+        # todo: Use transaction
+        await self.db_pool.simple_update_one(
+            table="vp_session_management",
+            keyvalues={"sid": sid},
+            updatevalues={"status": status.value},
+        )
+
+    async def invalidate_vp_session(self, sid: str) -> None:
+        await self.update_vp_session_status(sid, VPSessionStatus.INVALIDATED)
 
     async def lookup_vp_type(self, sid: str) -> Optional[VPType]:
         try:
@@ -257,7 +297,9 @@ class ProfileWorkerStore(SQLBaseStore):
         (vp_type,) = ret
         return VPType(vp_type)
 
-    async def validate_vp_session(self, sid: str, expected_status: str) -> bool:
+    async def validate_vp_session(
+        self, sid: str, expected_status: VPSessionStatus
+    ) -> bool:
         # todo: Allow reference from other functions
         vp_session_timeout = 300000
 
@@ -273,8 +315,9 @@ class ProfileWorkerStore(SQLBaseStore):
         except StoreError:
             return False
 
-        status, created_ts = ret
-        if status == "invalidated":
+        raw_st, created_ts = ret
+        status = VPSessionStatus(raw_st)
+        if status == VPSessionStatus.INVALIDATED:
             return False
 
         now = self._clock.time_msec()

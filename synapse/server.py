@@ -792,6 +792,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SIOPv2Handler(self)
 
     @cache_in_self
+    def get_verifiable_presentation_handler(self) -> "VerifiablePresentationHandler":
+        from synapse.handlers.vp_handler import VerifiablePresentationHandler
+
+        return VerifiablePresentationHandler(self)
+
+    @cache_in_self
     def get_oid4vc_request_object_signer(self) -> OID4VCRequestObjectSigner:
         return OID4VCRequestObjectSigner(self)
 
