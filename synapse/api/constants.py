@@ -290,15 +290,18 @@ class Direction(enum.Enum):
     BACKWARDS = "b"
     FORWARDS = "f"
 
+
 class VPSessionStatus(enum.Enum):
     CREATED = "created"
     POSTED = "posted"
     INVALIDATED = "invalidated"
 
+
 class SIOPv2SessionStatus(enum.Enum):
     CREATED = "created"
     POSTED = "posted"
     INVALIDATED = "invalidated"
+
 
 class VPType(enum.Enum):
     AGE_OVER_13 = "ageOver13"

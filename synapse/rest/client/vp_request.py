@@ -2,13 +2,12 @@ import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import VPType
+from synapse.api.constants import VPSessionStatus, VPType
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
-from synapse.api.constants import VPSessionStatus
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer

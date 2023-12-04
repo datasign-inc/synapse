@@ -2,12 +2,12 @@ import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.constants import SIOPv2SessionStatus
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
-from synapse.api.constants import SIOPv2SessionStatus
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -26,7 +26,9 @@ class HandleSIOPv2ClientMetadata(RestServlet):
         self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if not await self.store.validate_siopv2_session(sid, SIOPv2SessionStatus.CREATED):
+        if not await self.store.validate_siopv2_session(
+            sid, SIOPv2SessionStatus.CREATED
+        ):
             return 400, {"message": "Bad Request"}
 
         await self._ro_signer.setup_signing_key(self.ro_signing_kid)
