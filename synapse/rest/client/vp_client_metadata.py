@@ -6,6 +6,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
+from synapse.api.constants import VPSessionStatus
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ class HandleVpClientMetadata(RestServlet):
         self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if not await self.store.validate_vp_session(sid, "created"):
+        if not await self.store.validate_vp_session(sid, VPSessionStatus.CREATED):
             return 400, {"message": "Bad Request"}
 
         await self._ro_signer.setup_signing_key(self.ro_signing_kid)

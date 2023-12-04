@@ -44,6 +44,7 @@ from synapse.storage.util.id_generators import IdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, UserID, UserInfo
 from synapse.util.caches.descriptors import cached
+from synapse.api.constants import SIOPv2SessionStatus
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1844,7 +1845,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="create_ui_auth_session",
         )
 
-    async def validate_siopv2_session(self, sid: str, expected_status: str) -> bool:
+    async def validate_siopv2_session(self, sid: str, expected_status: SIOPv2SessionStatus) -> bool:
         # todo: Allow reference from other functions
         siopv2_session_timeout = 300000
 
@@ -1860,8 +1861,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         except StoreError:
             return False
 
-        status, created_ts = ret
-        if status == "invalidated":
+        raw_st, created_ts = ret
+        status = SIOPv2SessionStatus(raw_st)
+
+        if status == SIOPv2SessionStatus.INVALIDATED:
             logger.info("siopv2_session_invalidated sid=%s" % sid)
             return False
 
