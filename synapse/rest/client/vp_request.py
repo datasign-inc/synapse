@@ -7,6 +7,7 @@ from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
+from synapse.api.constants import VPType
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -14,8 +15,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def make_required_descriptors(vp_type: str):
-    if vp_type == "ageOver13":
+def make_required_descriptors(vp_type: VPType):
+    if vp_type == VPType.AGE_OVER_13:
         descriptors = [
             {
                 "group": "A",
@@ -54,7 +55,7 @@ def make_required_descriptors(vp_type: str):
 
         return descriptors, requirements
 
-    if vp_type == "affiliation":
+    if vp_type == VPType.AFFILIATION:
         descriptors = [
             {
                 "group": "A",

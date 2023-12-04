@@ -22,6 +22,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, UserID
+from synapse.api.constants import VPType
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -218,12 +219,12 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="set_profile_avatar_url",
         )
 
-    async def register_vp_session(self, sid: str, vp_type: str, ro_nonce: str) -> None:
+    async def register_vp_session(self, sid: str, vp_type: VPType, ro_nonce: str) -> None:
         await self.db_pool.simple_insert(
             table="vp_session_management",
             values={
                 "sid": sid,
-                "vp_type": vp_type,
+                "vp_type": vp_type.value,
                 "status": "created",
                 "ro_nonce": ro_nonce,
                 "created_ts": self._clock.time_msec(),
@@ -243,7 +244,7 @@ class ProfileWorkerStore(SQLBaseStore):
         (ro_nonce,) = ret
         return ro_nonce
 
-    async def lookup_vp_type(self, sid: str) -> Optional[str]:
+    async def lookup_vp_type(self, sid: str) -> Optional[VPType]:
         try:
             ret = await self.db_pool.simple_select_one(
                 table="vp_session_management",
@@ -254,7 +255,7 @@ class ProfileWorkerStore(SQLBaseStore):
             return None
 
         (vp_type,) = ret
-        return vp_type
+        return VPType(vp_type)
 
     async def validate_vp_session(self, sid: str, expected_status: str) -> bool:
         # todo: Allow reference from other functions

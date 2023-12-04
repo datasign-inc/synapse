@@ -32,7 +32,7 @@ class HandleVpInitiation(RestServlet):
     ) -> Tuple[int, JsonDict]:
         sid = random_string(32)
         ro_nonce = random_string(8)
-        await self.store.register_vp_session(sid, vp_type, ro_nonce)
+        await self.store.register_vp_session(sid, VPType(vp_type), ro_nonce)
 
         client_id = urllib.parse.urljoin(
             self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])
