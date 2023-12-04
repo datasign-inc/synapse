@@ -41,12 +41,14 @@ class VerifiablePresentationHandler:
         return pubkey_from_x5c
 
     async def handle_siopv2_response(self, request: SynapseRequest, sid: str):
-        content_type = request.requestHeaders.getRawHeaders("Content-Type")
+        content_type_list = request.requestHeaders.getRawHeaders("Content-Type")
 
         # check content-type header
-        if content_type != "application/x-www-form-urlencoded":
-            logger.info("unexpexted Content-Type: %s" % content_type)
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading content")
+        if (
+            len(content_type_list) != 1
+            or content_type_list[0] != "application/x-www-form-urlencoded"
+        ):
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Error Unexpected Content-Type")
 
         # get vp_token and presentation_submission from request
         try:
