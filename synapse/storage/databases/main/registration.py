@@ -2000,8 +2000,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         except StoreError:
             return None
 
-        (token,) = value
-        return token
+        return value
 
     async def add_login_token_to_user(
         self,
