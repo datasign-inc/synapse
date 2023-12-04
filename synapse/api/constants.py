@@ -289,3 +289,7 @@ class ApprovalNoticeMedium:
 class Direction(enum.Enum):
     BACKWARDS = "b"
     FORWARDS = "f"
+
+class VPType(enum.Enum):
+    AGE_OVER_13 = "ageOver13"
+    AFFILIATION = "affiliation"

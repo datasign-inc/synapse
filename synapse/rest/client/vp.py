@@ -1,6 +1,5 @@
 import logging
 import urllib.parse
-from enum import Enum
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.http.server import HttpServer
@@ -9,16 +8,12 @@ from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
 from synapse.util.stringutils import random_string
+from synapse.api.constants import VPType
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
-
-
-class VPType(Enum):
-    AGE_OVER_13 = "ageOver13"
-    AFFILIATION = "affiliation"
 
 
 class HandleVpInitiation(RestServlet):
