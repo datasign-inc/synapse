@@ -60,6 +60,7 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
+from synapse.api.constants import SIOPv2SessionStatus
 from synapse.api.errors import Codes, SynapseError
 from synapse.config import ConfigError
 from synapse.config.oidc import OidcProviderClientSecretJwtKey, OidcProviderConfig
@@ -268,7 +269,9 @@ class SIOPv2Handler:
 
             logger.info("userinfo returned %s", userinfo)
 
-            await self._store.update_siopv2_session_status(siopv2_sid, "posted")
+            await self._store.update_siopv2_session_status(
+                siopv2_sid, SIOPv2SessionStatus.POSTED
+            )
 
             # todo: Correct to appropriate value
             provider = self._providers.get("oidc-github")

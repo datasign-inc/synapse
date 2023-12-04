@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 import attr
 from authlib.jose import JsonWebKey, Key as JwkKey
 
-from synapse.api.constants import UserTypes
+from synapse.api.constants import SIOPv2SessionStatus, UserTypes
 from synapse.api.errors import (
     Codes,
     NotFoundError,
@@ -44,7 +44,6 @@ from synapse.storage.util.id_generators import IdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, UserID, UserInfo
 from synapse.util.caches.descriptors import cached
-from synapse.api.constants import SIOPv2SessionStatus
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1845,7 +1844,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="create_ui_auth_session",
         )
 
-    async def validate_siopv2_session(self, sid: str, expected_status: SIOPv2SessionStatus) -> bool:
+    async def validate_siopv2_session(
+        self, sid: str, expected_status: SIOPv2SessionStatus
+    ) -> bool:
         # todo: Allow reference from other functions
         siopv2_session_timeout = 300000
 
@@ -1875,16 +1876,18 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return status == expected_status
 
-    async def update_siopv2_session_status(self, sid: str, status: str) -> None:
+    async def update_siopv2_session_status(
+        self, sid: str, status: SIOPv2SessionStatus
+    ) -> None:
         # todo: Use transaction
         await self.db_pool.simple_update_one(
             table="siopv2_session",
             keyvalues={"sid": sid},
-            updatevalues={"status": status},
+            updatevalues={"status": status.value},
         )
 
     async def invalidate_siopv2_session(self, sid: str) -> None:
-        await self.update_siopv2_session_status(sid, "invalidated")
+        await self.update_siopv2_session_status(sid, SIOPv2SessionStatus.INVALIDATED)
 
     async def lookup_refresh_token(
         self, token: str
