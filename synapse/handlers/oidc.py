@@ -205,7 +205,7 @@ class SIOPv2Handler:
                 logger.info(f"Invalid sub value : {sub} != {jwk_thumbprint}")
                 return
 
-            jwt = JsonWebToken(["RS256", "ES256K"])
+            jwt = JsonWebToken(["RS256", "ES256K", "ES256"])
             logger.info(f"public key : {sub_jwk}")
             try:
                 claims = jwt.decode(id_token, key=sub_jwk, claims_cls=CodeIDToken)
