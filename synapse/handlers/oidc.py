@@ -73,7 +73,6 @@ from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 from synapse.util.macaroons import MacaroonGenerator, OidcSessionData
-from synapse.util.stringutils import add_query_param_to_url
 from synapse.util.templates import _localpart_from_email_filter
 
 if TYPE_CHECKING:
@@ -251,13 +250,16 @@ class SIOPv2Handler:
             expected_nonce = await self._store.lookup_siopv2_ro_nonce(siopv2_sid)
 
             logger.info("making expected aud")
-            expected_aud = "/".join([
-                urllib.parse.urljoin(
-                    # todo: Fix hard coding
-                    self.base_url, "/_matrix/client/v3/siopv2_response"
-                ),
-                siopv2_sid
-            ])
+            expected_aud = "/".join(
+                [
+                    urllib.parse.urljoin(
+                        # todo: Fix hard coding
+                        self.base_url,
+                        "/_matrix/client/v3/siopv2_response",
+                    ),
+                    siopv2_sid,
+                ]
+            )
             logger.info("creation ok")
 
             userinfo = await self._verify_token(
