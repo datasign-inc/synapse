@@ -40,7 +40,7 @@ class VerifiablePresentationHandler:
 
         return pubkey_from_x5c
 
-    async def handle_siopv2_response(self, request: SynapseRequest, sid: str):
+    async def handle_vp_response(self, request: SynapseRequest, sid: str):
         content_type_list = request.requestHeaders.getRawHeaders("Content-Type")
 
         # check content-type header
