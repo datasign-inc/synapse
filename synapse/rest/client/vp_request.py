@@ -99,11 +99,13 @@ class HandleVpRequest(RestServlet):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
+        self._auth = hs.get_auth()
         self._ro_signer = hs.get_oid4vc_request_object_signer()
         self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
         self.base_url = self.hs.config.server.public_baseurl
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
         if not await self.store.validate_vp_session(sid, VPSessionStatus.CREATED):
             return 400, {"message": "Bad Request"}
 

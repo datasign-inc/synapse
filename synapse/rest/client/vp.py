@@ -25,11 +25,16 @@ class HandleVpInitiation(RestServlet):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
+        self._auth = hs.get_auth()
         self.base_url = self.hs.config.server.public_baseurl
 
     async def on_GET(
         self, request: SynapseRequest, vp_type: str
     ) -> Tuple[int, JsonDict]:
+
+        requester = await self._auth.get_user_by_req(request)
+        # todo: Add user_id and session binding.
+
         sid = random_string(32)
         ro_nonce = random_string(8)
         await self.store.register_vp_session(sid, VPType(vp_type), ro_nonce)

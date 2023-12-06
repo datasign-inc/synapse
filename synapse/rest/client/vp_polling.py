@@ -17,9 +17,12 @@ class HandleVPPolling(RestServlet):
     def __init__(self, hs: "HomeServer") -> None:
         super().__init__()
         self.hs = hs
+        self._auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
+
         if not await self.store.validate_vp_session(sid, VPSessionStatus.POSTED):
             return 400, {"message": "Bad Request"}
 
