@@ -2,7 +2,8 @@ import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import VPSessionStatus, VPType
+from synapse.api.constants import VPSessionStatus
+from synapse.handlers.vp_handler import make_required_descriptors
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -13,83 +14,6 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
-
-
-def make_required_descriptors(vp_type: VPType):
-    if vp_type == VPType.AGE_OVER_13:
-        descriptors = [
-            {
-                "group": "A",
-                "id": "identity_credential_based_on_myna",
-                "name": "年齢が13以上であることを確認します",
-                "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
-                "format": {
-                    "vc+sd-jwt": {
-                        "alg": ["ES256", "ES256K"],
-                    }
-                },
-                "constraints": {
-                    "fields": [
-                        {
-                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/proxy-vci/src/vci/identityCredential.ts#L187
-                            "path": ["$.is_older_than_13"],
-                            "filter": {
-                                "type": "string",
-                                # todo: to be implemented. may be JSON Schema URL?
-                                "const": "",
-                            },
-                        }
-                    ],
-                    # This indicates that the Conformant Consumer MUST limit
-                    # submitted fields to those listed in the fields array
-                    "limit_disclosure,": "required",
-                },
-            }
-        ]
-
-        # submission_requirements property defines which
-        # Input Descriptors are required for submission,
-        requirements = [
-            {"name": "Age over 13 years old", "rule": "pick", "count": 1, "from": "A"}
-        ]
-
-        return descriptors, requirements
-
-    if vp_type == VPType.AFFILIATION:
-        descriptors = [
-            {
-                "group": "A",
-                "id": "affiliation",
-                "name": "所属情報を確認します",
-                "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
-                "format": {
-                    "vc+sd-jwt": {
-                        "alg": ["ES256", "ES256K"],
-                    }
-                },
-                "constraints": {
-                    "fields": [
-                        {
-                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/employee-vci/src/vci/employeeCredential.ts#L50
-                            "path": ["$.division"],
-                            "filter": {
-                                "type": "string",
-                                "const": "",  # todo: to be implemented
-                            },
-                        }
-                    ],
-                    "limit_disclosure,": "required",
-                },
-            }
-        ]
-
-        requirements = [
-            {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
-        ]
-
-        return descriptors, requirements
-
-    raise ValueError("unexpected vp_type %s" % vp_type)
 
 
 class HandleVpRequest(RestServlet):
