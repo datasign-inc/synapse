@@ -68,6 +68,7 @@ class VerifiablePresentationHandler:
             )
 
         # verify vp_token
+        # todo: verify presentation_submission
         try:
             expected_aud = urllib.parse.urljoin(
                 self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])
