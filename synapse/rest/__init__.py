@@ -69,6 +69,7 @@ from synapse.rest.client import (
     vp_polling,
     vp_request,
     vp_response,
+    verify_by_server
 )
 
 if TYPE_CHECKING:
@@ -136,6 +137,8 @@ class ClientRestResource(JsonResource):
             vp_polling.register_servlets(hs, client_resource)
             vp_response.register_servlets(hs, client_resource)
             vp_client_metadata.register_servlets(hs, client_resource)
+        if is_main_process:
+            verify_by_server.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
         room_keys.register_servlets(hs, client_resource)
