@@ -61,6 +61,7 @@ from synapse.rest.client import (
     thirdparty,
     tokenrefresh,
     user_directory,
+    verify_by_server,
     versions,
     voip,
     vp,
@@ -69,7 +70,6 @@ from synapse.rest.client import (
     vp_polling,
     vp_request,
     vp_response,
-    verify_by_server
 )
 
 if TYPE_CHECKING:

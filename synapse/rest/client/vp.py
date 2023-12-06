@@ -31,7 +31,6 @@ class HandleVpInitiation(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, vp_type: str
     ) -> Tuple[int, JsonDict]:
-
         requester = await self._auth.get_user_by_req(request)
         # todo: Add user_id and session binding.
 

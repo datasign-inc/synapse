@@ -1,5 +1,4 @@
 import logging
-import urllib.parse
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import VPType
@@ -29,7 +28,6 @@ class HandleVerifyAge(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, vp_type: str
     ) -> Tuple[int, JsonDict]:
-
         requester = await self._auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
@@ -39,7 +37,9 @@ class HandleVerifyAge(RestServlet):
 
         response_data = {
             # todo: add more check
-            "verification_status": "ok" if len(vp_data) > 0 else "ng"
+            "verification_status": "ok"
+            if len(vp_data) > 0
+            else "ng"
         }
 
         return 200, response_data
