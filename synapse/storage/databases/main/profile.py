@@ -236,30 +236,54 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def register_vp_data(
-        self, user_id: str, vp_type: VPType, verified_claims: dict, raw_vp_token: str
+        self,
+        user_id: str,
+        vp_type: VPType,
+        verifies_main_claims: dict,
+        verified_all_claims: dict,
+        raw_vp_token: str,
     ) -> None:
-        await self.db_pool.simple_insert(
-            table="user_vp_data",
-            values={
-                "user_id": user_id,
-                "vp_type": vp_type.value,
-                "verified_claims": json.dumps(verified_claims),
-                "raw_vp_token": raw_vp_token,
-                "created_ts": self._clock.time_msec(),
-            },
-            desc="register_user_vp_data",
+        sql = """INSERT INTO user_vp_data
+        (user_id, vp_type,
+        num,
+        verified_main_claims,
+        verified_all_claims, raw_vp_token, created_ts)
+        VALUES
+        (?, ?,
+        (SELECT COALESCE(MAX(num), 0) + 1
+         FROM user_vp_data WHERE user_id = ? AND vp_type = ?),
+        ?, ?, ?, ?)
+        """
+        await self.db_pool.execute(
+            "register_user_vp_data",
+            sql,
+            user_id,
+            vp_type.value,
+            user_id,
+            vp_type.value,
+            json.dumps(verifies_main_claims),
+            json.dumps(verified_all_claims),
+            raw_vp_token,
+            self._clock.time_msec(),
+        )
+
+    async def delete_vp_data(self, user_id: str, vp_type: VPType, num: int) -> None:
+        await self.db_pool.simple_delete(
+            "user_vp_data",
+            keyvalues={"user_id": user_id, "vp_type": vp_type.value, "num": num},
+            desc="delete user_vp_data",
         )
 
     async def lookup_vp_data(
         self, user_id: str, vp_type: VPType
-    ) -> List[Tuple[dict, str]]:
+    ) -> List[Tuple[int, dict, str]]:
         ret = await self.db_pool.simple_select_list(
             "user_vp_data",
             keyvalues={"user_id": user_id, "vp_type": vp_type.value},
-            retcols=["verified_claims", "raw_vp_token"],
+            retcols=["num", "verified_main_claims", "verified_all_claims"],
             desc="lookup_vp_data",
         )
-        return [(json.loads(x[0]), x[1]) for x in ret]
+        return [(x[0], json.loads(x[1]), json.loads(x[2])) for x in ret]
 
     async def lookup_vp_ro_nonce(self, sid: str) -> Optional[str]:
         try:

@@ -33,15 +33,21 @@ class HandleVerifyByServer(RestServlet):
 
         logger.info("user_id %s" % user_id)
 
-        vp_data = await self.store.lookup_vp_data(user_id, VPType(vp_type))
+        typ = VPType(vp_type)
+        vp_data = await self.store.lookup_vp_data(user_id, typ)
 
-        response_data = {
-            # todo: add more check
-            "verification_status": "ok"
-            if len(vp_data) > 0
-            else "ng"
+        data = {
+            num: {"main_claims": main_claims, "all_claims": all_claims}
+            for (num, main_claims, all_claims) in vp_data
         }
 
+        response_data = {
+            "vp_type": typ.value,
+            "description_ja": typ.description_ja,
+            "verified_data": data,
+        }
+
+        # todo: Should be implemented as a response to the profile API
         return 200, response_data
 
 

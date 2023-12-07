@@ -2,9 +2,10 @@ import json
 import logging
 import urllib.parse
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Dict, List, Tuple
 from urllib.parse import parse_qs
 
+from jsonpath_ng import parse as jsonpath_parse
 from jwcrypto.jwk import JWK
 from sd_jwt.verifier import SDJWTVerifier
 
@@ -18,81 +19,91 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def make_required_descriptors(vp_type: VPType):
-    if vp_type == VPType.AGE_OVER_13:
-        descriptors = [
-            {
-                "group": "A",
-                "id": "identity_credential_based_on_myna",
-                "name": "年齢が13以上であることを確認します",
-                "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
-                "format": {
-                    "vc+sd-jwt": {
-                        "alg": ["ES256", "ES256K"],
+JSON_PATH: Dict[VPType, List[str]] = {
+    VPType.AGE_OVER_13: ["$.is_older_than_13"],
+    VPType.AFFILIATION: ["$.division"],
+}
+
+SUBMISSION_REQUIREMENTS: Dict[VPType, List[Dict[str, any]]] = {
+    VPType.AGE_OVER_13: [
+        {"name": "Age over 13 years old", "rule": "pick", "count": 1, "from": "A"}
+    ],
+    VPType.AFFILIATION: [
+        {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
+    ],
+}
+
+SUBMISSION_VC_FORMAT: Dict[str, Dict[str, List[str]]] = {
+    "vc+sd-jwt": {
+        "alg": ["ES256", "ES256K"],
+    }
+}
+
+INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
+    VPType.AGE_OVER_13: [
+        {
+            "group": "A",
+            "id": "identity_credential_based_on_myna",
+            "name": "年齢が13以上であることを確認します",
+            "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
+            "format": SUBMISSION_VC_FORMAT,
+            "constraints": {
+                "fields": [
+                    {
+                        "path": JSON_PATH[VPType.AGE_OVER_13],
+                        "filter": {
+                            "type": "string",
+                            # todo: to be implemented. may be JSON Schema URL?
+                            "const": "",
+                        },
                     }
-                },
-                "constraints": {
-                    "fields": [
-                        {
-                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/proxy-vci/src/vci/identityCredential.ts#L187
-                            "path": ["$.is_older_than_13"],
-                            "filter": {
-                                "type": "string",
-                                # todo: to be implemented. may be JSON Schema URL?
-                                "const": "",
-                            },
-                        }
-                    ],
-                    # This indicates that the Conformant Consumer MUST limit
-                    # submitted fields to those listed in the fields array
-                    "limit_disclosure,": "required",
-                },
-            }
-        ]
-
-        # submission_requirements property defines which
-        # Input Descriptors are required for submission,
-        requirements = [
-            {"name": "Age over 13 years old", "rule": "pick", "count": 1, "from": "A"}
-        ]
-
-        return descriptors, requirements
-
-    if vp_type == VPType.AFFILIATION:
-        descriptors = [
-            {
-                "group": "A",
-                "id": "affiliation",
-                "name": "所属情報を確認します",
-                "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
-                "format": {
-                    "vc+sd-jwt": {
-                        "alg": ["ES256", "ES256K"],
+                ],
+                # This indicates that the Conformant Consumer MUST limit
+                # submitted fields to those listed in the fields array
+                "limit_disclosure,": "required",
+            },
+        }
+    ],
+    VPType.AFFILIATION: [
+        {
+            "group": "A",
+            "id": "affiliation",
+            "name": "所属情報を確認します",
+            "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
+            "format": SUBMISSION_VC_FORMAT,
+            "constraints": {
+                "fields": [
+                    {
+                        "path": JSON_PATH[VPType.AFFILIATION],
+                        "filter": {
+                            "type": "string",
+                            "const": "",  # todo: to be implemented
+                        },
                     }
-                },
-                "constraints": {
-                    "fields": [
-                        {
-                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/employee-vci/src/vci/employeeCredential.ts#L50
-                            "path": ["$.division"],
-                            "filter": {
-                                "type": "string",
-                                "const": "",  # todo: to be implemented
-                            },
-                        }
-                    ],
-                    "limit_disclosure,": "required",
-                },
-            }
-        ]
+                ],
+                "limit_disclosure,": "required",
+            },
+        }
+    ],
+}
 
-        requirements = [
-            {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
-        ]
 
-        return descriptors, requirements
+def resolve_json_path(
+    vp_type: VPType, verified_claims: Dict[str, any]
+) -> Dict[str, List[any]]:
+    result = []
+    paths = JSON_PATH[vp_type]
+    for path in paths:
+        expr = jsonpath_parse(path)
+        matches = expr.find(verified_claims)
+        result.append([each.value for each in matches])
+    return dict(zip(paths, result))
 
-    raise ValueError("unexpected vp_type %s" % vp_type)
+
+def make_required_descriptors(
+    vp_type: VPType,
+) -> Tuple[List[Dict[str, any]], List[Dict[str, any]]]:
+    return INPUT_DESCRIPTORS[vp_type], SUBMISSION_REQUIREMENTS[vp_type]
 
 
 class VerifiablePresentationHandler:
@@ -239,7 +250,9 @@ class VerifiablePresentationHandler:
         user_id = requester.user.to_string()
         vp_type = await self._store.lookup_vp_type(sid)
 
+        main_claims = resolve_json_path(vp_type, verified_claims)
+
         await self._store.register_vp_data(
-            user_id, vp_type, verified_claims, raw_token_value
+            user_id, vp_type, main_claims, verified_claims, raw_token_value
         )
         await self._store.update_vp_session_status(sid, VPSessionStatus.POSTED)
