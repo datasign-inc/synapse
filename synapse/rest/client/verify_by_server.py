@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class HandleVerifyAge(RestServlet):
+class HandleVerifyByServer(RestServlet):
     PATTERNS = client_patterns(
         "/verify_by_server/(?P<vp_type>(%s))$" % "|".join([x.value for x in VPType])
     )
@@ -46,4 +46,4 @@ class HandleVerifyAge(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    HandleVerifyAge(hs).register(http_server)
+    HandleVerifyByServer(hs).register(http_server)
