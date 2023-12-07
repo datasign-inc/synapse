@@ -14,5 +14,5 @@
  */
 ALTER TABLE siopv2_session ADD COLUMN ro_nonce TEXT DEFAULT '';
 
-CREATE INDEX siopv2_session_ro_nonce_idx
+CREATE INDEX IF NOT EXISTS siopv2_session_ro_nonce_idx
     ON siopv2_session (ro_nonce);
