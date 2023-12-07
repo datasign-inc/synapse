@@ -60,6 +60,7 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
+from synapse.api.constants import SIOPv2SessionStatus
 from synapse.api.errors import Codes, SynapseError
 from synapse.config import ConfigError
 from synapse.config.oidc import OidcProviderClientSecretJwtKey, OidcProviderConfig
@@ -73,7 +74,6 @@ from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 from synapse.util.macaroons import MacaroonGenerator, OidcSessionData
-from synapse.util.stringutils import add_query_param_to_url
 from synapse.util.templates import _localpart_from_email_filter
 
 if TYPE_CHECKING:
@@ -126,7 +126,7 @@ class JWKS(TypedDict):
     keys: List[JWK]
 
 
-def calculate_jwk_thumbprint(jwk_dict):
+def calculate_jwk_thumbprint(jwk_dict: dict) -> str:
     jwk_json = json.dumps(jwk_dict, sort_keys=True, separators=(",", ":"))
     logger.info(f"jwk_json for calculation : {jwk_json}")
     jwk_bytes = jwk_json.encode("utf-8")
@@ -205,7 +205,7 @@ class SIOPv2Handler:
                 logger.info(f"Invalid sub value : {sub} != {jwk_thumbprint}")
                 return
 
-            jwt = JsonWebToken(["RS256", "ES256K"])
+            jwt = JsonWebToken(["RS256", "ES256K", "ES256"])
             logger.info(f"public key : {sub_jwk}")
             try:
                 claims = jwt.decode(id_token, key=sub_jwk, claims_cls=CodeIDToken)
@@ -232,11 +232,12 @@ class SIOPv2Handler:
     async def handle_siopv2_response(self, request: SynapseRequest, siopv2_sid: str):
         try:
             content_bytes = request.content.read()  # type: ignore
+            content_type_list = request.requestHeaders.getRawHeaders("Content-Type")
             if (
-                request.requestHeaders.getRawHeaders("Content-Type")
-                != "application/x-www-form-urlencoded"
+                len(content_type_list) != 1
+                or content_type_list[0] != "application/x-www-form-urlencoded"
             ):
-                raise Exception("Invalid content type")
+                raise Exception("Error Unexpected Content-Type")
         except Exception:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading content")
 
@@ -248,16 +249,18 @@ class SIOPv2Handler:
                 raise Exception("id_token not found")
 
             token = Token(id_token=id_token[0])
-            expected_nonce = await self._store.lookup_ro_nonce(siopv2_sid)
+            expected_nonce = await self._store.lookup_siopv2_ro_nonce(siopv2_sid)
 
             logger.info("making expected aud")
-            expected_aud = add_query_param_to_url(
-                # todo: Fix hard coding
-                urllib.parse.urljoin(
-                    self.base_url, "/_matrix/client/v3/siopv2_response"
-                ),
-                "sv2sid",
-                siopv2_sid,
+            expected_aud = "/".join(
+                [
+                    urllib.parse.urljoin(
+                        # todo: Fix hard coding
+                        self.base_url,
+                        "/_matrix/client/v3/siopv2_response",
+                    ),
+                    siopv2_sid,
+                ]
             )
             logger.info("creation ok")
 
@@ -267,7 +270,9 @@ class SIOPv2Handler:
 
             logger.info("userinfo returned %s", userinfo)
 
-            await self._store.update_siopv2_session_status(siopv2_sid, "posted")
+            await self._store.update_siopv2_session_status(
+                siopv2_sid, SIOPv2SessionStatus.POSTED
+            )
 
             # todo: Correct to appropriate value
             provider = self._providers.get("oidc-github")

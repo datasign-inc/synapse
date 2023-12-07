@@ -1,11 +1,16 @@
 import logging
 import urllib.parse
-from typing import Tuple
+from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.constants import SIOPv2SessionStatus
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -13,17 +18,20 @@ logger = logging.getLogger(__name__)
 class HandleSIOPv2ClientMetadata(RestServlet):
     PATTERNS = client_patterns("/siopv2_client_metadata/(?P<sid>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastores().main
         self._ro_signer = hs.get_oid4vc_request_object_signer()
+        self.ro_signing_kid = self.hs.config.server.request_object_signing_kid
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        if not await self.store.validate_siopv2_session(sid, "created"):
+        if not await self.store.validate_siopv2_session(
+            sid, SIOPv2SessionStatus.CREATED
+        ):
             return 400, {"message": "Bad Request"}
 
-        await self._ro_signer.setup_signing_key("kid1")
+        await self._ro_signer.setup_signing_key(self.ro_signing_kid)
         base_url = self.hs.config.server.public_baseurl
 
         response_data = {
@@ -41,5 +49,5 @@ class HandleSIOPv2ClientMetadata(RestServlet):
         return 200, response_data
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     HandleSIOPv2ClientMetadata(hs).register(http_server)

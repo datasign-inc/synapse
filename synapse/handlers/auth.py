@@ -753,7 +753,7 @@ class AuthHandler:
         sid = await self._create_siopv2_session()
         base_url = self.hs.config.server.public_baseurl
 
-        def add_sid(url, sid):
+        def add_sid(url: str, sid: str) -> str:
             return "/".join([url, sid])
 
         # todo: fix hard-coding of paths

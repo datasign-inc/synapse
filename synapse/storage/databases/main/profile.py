@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Optional
+import json
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from synapse.api.constants import VPSessionStatus, VPType
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -25,6 +27,8 @@ from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+from synapse.api.errors import StoreError
 
 
 class ProfileWorkerStore(SQLBaseStore):
@@ -216,58 +220,104 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="set_profile_avatar_url",
         )
 
-    async def start_vp_session(self, vpsid: str, vp_type: str, ro_nonce: str) -> None:
+    async def register_vp_session(
+        self, sid: str, vp_type: VPType, ro_nonce: str
+    ) -> None:
         await self.db_pool.simple_insert(
             table="vp_session_management",
             values={
-                "sid": vpsid,
-                "vp_type": vp_type,
+                "sid": sid,
+                "vp_type": vp_type.value,
                 "status": "created",
                 "ro_nonce": ro_nonce,
                 "created_ts": self._clock.time_msec(),
             },
-            desc="start_vp_session",
+            desc="register_vp_session",
         )
 
-    async def lookup_vp_nonce(self, sid) -> Optional[str]:
-        ret = await self.db_pool.simple_select_one(
-            table="vp_session_management",
-            keyvalues={"sid": sid},
-            retcols=["ro_nonce"],
+    async def register_vp_data(
+        self, user_id: str, vp_type: VPType, verified_claims: dict, raw_vp_token: str
+    ) -> None:
+        await self.db_pool.simple_insert(
+            table="user_vp_data",
+            values={
+                "user_id": user_id,
+                "vp_type": vp_type.value,
+                "verified_claims": json.dumps(verified_claims),
+                "raw_vp_token": raw_vp_token,
+                "created_ts": self._clock.time_msec(),
+            },
+            desc="register_user_vp_data",
         )
-        if ret is None:
+
+    async def lookup_vp_data(
+        self, user_id: str, vp_type: VPType
+    ) -> List[Tuple[dict, str]]:
+        ret = await self.db_pool.simple_select_list(
+            "user_vp_data",
+            keyvalues={"user_id": user_id, "vp_type": vp_type.value},
+            retcols=["verified_claims", "raw_vp_token"],
+            desc="lookup_vp_data",
+        )
+        return [(json.loads(x[0]), x[1]) for x in ret]
+
+    async def lookup_vp_ro_nonce(self, sid: str) -> Optional[str]:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["ro_nonce"],
+            )
+        except StoreError:
             return None
         (ro_nonce,) = ret
         return ro_nonce
 
-    async def lookup_vp_type(self, sid) -> Optional[str]:
-        ret = await self.db_pool.simple_select_one(
+    async def update_vp_session_status(self, sid: str, status: VPSessionStatus) -> None:
+        # todo: Use transaction
+        await self.db_pool.simple_update_one(
             table="vp_session_management",
             keyvalues={"sid": sid},
-            retcols=["vp_type"],
+            updatevalues={"status": status.value},
         )
-        if ret is None:
-            return None
-        (vp_type,) = ret
-        return vp_type
 
-    async def validate_vp_session(self, sid, expected_status) -> bool:
+    async def invalidate_vp_session(self, sid: str) -> None:
+        await self.update_vp_session_status(sid, VPSessionStatus.INVALIDATED)
+
+    async def lookup_vp_type(self, sid: str) -> Optional[VPType]:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["vp_type"],
+            )
+        except StoreError:
+            return None
+
+        (vp_type,) = ret
+        return VPType(vp_type)
+
+    async def validate_vp_session(
+        self, sid: str, expected_status: VPSessionStatus
+    ) -> bool:
         # todo: Allow reference from other functions
         vp_session_timeout = 300000
 
         if sid == "":
             return False
 
-        ret = await self.db_pool.simple_select_one(
-            table="vp_session_management",
-            keyvalues={"sid": sid},
-            retcols=["status", "created_ts"],
-        )
-        if ret is None:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["status", "created_ts"],
+            )
+        except StoreError:
             return False
 
-        status, created_ts = ret
-        if status == "invalidated":
+        raw_st, created_ts = ret
+        status = VPSessionStatus(raw_st)
+        if status == VPSessionStatus.INVALIDATED:
             return False
 
         now = self._clock.time_msec()

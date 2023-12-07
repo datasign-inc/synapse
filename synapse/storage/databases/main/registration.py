@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 import attr
 from authlib.jose import JsonWebKey, Key as JwkKey
 
-from synapse.api.constants import UserTypes
+from synapse.api.constants import SIOPv2SessionStatus, UserTypes
 from synapse.api.errors import (
     Codes,
     NotFoundError,
@@ -1791,14 +1791,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="mark_access_token_as_used",
         )
 
-    async def register_siopv2_session(self, sid):
+    async def register_siopv2_session(self, sid: str) -> None:
         created_ts = self._clock.time_msec()
         status = "created"
         await self.db_pool.simple_insert(
             "siopv2_session", {"sid": sid, "status": status, "created_ts": created_ts}
         )
 
-    async def register_ro_nonce(self, sid, nonce):
+    async def register_siopv2_ro_nonce(self, sid: str, nonce: str) -> None:
         # todo: Use transaction
         await self.db_pool.simple_update_one(
             table="siopv2_session",
@@ -1806,13 +1806,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             updatevalues={"ro_nonce": nonce},
         )
 
-    async def lookup_ro_nonce(self, sid) -> Optional[str]:
-        ret = await self.db_pool.simple_select_one(
-            table="siopv2_session",
-            keyvalues={"sid": sid},
-            retcols=["ro_nonce"],
-        )
-        if ret is None:
+    async def lookup_siopv2_ro_nonce(self, sid: str) -> Optional[str]:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="siopv2_session",
+                keyvalues={"sid": sid},
+                retcols=["ro_nonce"],
+            )
+        except StoreError:
             return None
         (ro_nonce,) = ret
         return ro_nonce
@@ -1820,13 +1821,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     async def lookup_ro_signing_key(self, kid: str) -> Optional[JwkKey]:
         cols = ["kid", "jwk_json_string"]
 
-        ret = await self.db_pool.simple_select_one(
-            table="request_object_signing_key",
-            keyvalues={"kid": kid},
-            retcols=cols,
-        )
-
-        if ret is None:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="request_object_signing_key",
+                keyvalues={"kid": kid},
+                retcols=cols,
+            )
+        except StoreError:
             return None
 
         (_, jwk_json_string) = ret
@@ -1843,24 +1844,28 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="create_ui_auth_session",
         )
 
-    async def validate_siopv2_session(self, sid, expected_status) -> bool:
+    async def validate_siopv2_session(
+        self, sid: str, expected_status: SIOPv2SessionStatus
+    ) -> bool:
         # todo: Allow reference from other functions
         siopv2_session_timeout = 300000
 
         if sid == "":
             return False
 
-        ret = await self.db_pool.simple_select_one(
-            table="siopv2_session",
-            keyvalues={"sid": sid},
-            retcols=["status", "created_ts"],
-        )
-        if ret is None:
-            logger.info("siopv2_session_not_found sid=%s" % sid)
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="siopv2_session",
+                keyvalues={"sid": sid},
+                retcols=["status", "created_ts"],
+            )
+        except StoreError:
             return False
 
-        status, created_ts = ret
-        if status == "invalidated":
+        raw_st, created_ts = ret
+        status = SIOPv2SessionStatus(raw_st)
+
+        if status == SIOPv2SessionStatus.INVALIDATED:
             logger.info("siopv2_session_invalidated sid=%s" % sid)
             return False
 
@@ -1871,16 +1876,18 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return status == expected_status
 
-    async def update_siopv2_session_status(self, sid: str, status: str) -> None:
+    async def update_siopv2_session_status(
+        self, sid: str, status: SIOPv2SessionStatus
+    ) -> None:
         # todo: Use transaction
         await self.db_pool.simple_update_one(
             table="siopv2_session",
             keyvalues={"sid": sid},
-            updatevalues={"status": status},
+            updatevalues={"status": status.value},
         )
 
-    async def invalidate_siopv2_session(self, sid) -> None:
-        await self.update_siopv2_session_status(sid, "invalidated")
+    async def invalidate_siopv2_session(self, sid: str) -> None:
+        await self.update_siopv2_session_status(sid, SIOPv2SessionStatus.INVALIDATED)
 
     async def lookup_refresh_token(
         self, token: str
@@ -1983,14 +1990,17 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "replace_refresh_token", _replace_refresh_token_txn
         )
 
-    async def get_login_token_for_siopv2_sid(self, siopv2_sid: str) -> str:
-        value = await self.db_pool.simple_select_one_onecol(
-            table="login_tokens",
-            keyvalues={"siopv2_sid": siopv2_sid},
-            retcol="token",
-        )
-        (token,) = value
-        return token
+    async def get_login_token_for_siopv2_sid(self, siopv2_sid: str) -> Optional[str]:
+        try:
+            value = await self.db_pool.simple_select_one_onecol(
+                table="login_tokens",
+                keyvalues={"siopv2_sid": siopv2_sid},
+                retcol="token",
+            )
+        except StoreError:
+            return None
+
+        return value
 
     async def add_login_token_to_user(
         self,
