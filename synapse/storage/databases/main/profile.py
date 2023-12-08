@@ -276,14 +276,19 @@ class ProfileWorkerStore(SQLBaseStore):
 
     async def lookup_vp_data(
         self, user_id: str, vp_type: VPType
-    ) -> List[Tuple[int, dict, str]]:
+    ) -> List[Tuple[int, dict, str, str]]:
         ret = await self.db_pool.simple_select_list(
             "user_vp_data",
             keyvalues={"user_id": user_id, "vp_type": vp_type.value},
-            retcols=["num", "verified_main_claims", "verified_all_claims"],
+            retcols=[
+                "num",
+                "verified_main_claims",
+                "verified_all_claims",
+                "raw_vp_token",
+            ],
             desc="lookup_vp_data",
         )
-        return [(x[0], json.loads(x[1]), json.loads(x[2])) for x in ret]
+        return [(x[0], json.loads(x[1]), json.loads(x[2]), x[3]) for x in ret]
 
     async def lookup_vp_ro_nonce(self, sid: str) -> Optional[str]:
         try:
