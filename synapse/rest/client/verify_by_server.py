@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import VPType
+from synapse.handlers.vp_handler import extract_issuer_info
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -37,8 +38,12 @@ class HandleVerifyByServer(RestServlet):
         vp_data = await self.store.lookup_vp_data(user_id, typ)
 
         data = {
-            num: {"main_claims": main_claims, "all_claims": all_claims}
-            for (num, main_claims, all_claims) in vp_data
+            num: {
+                "main_claims": main_claims,
+                "all_claims": all_claims,
+                "issuer_info": extract_issuer_info(all_claims, raw_vp_token),
+            }
+            for (num, main_claims, all_claims, raw_vp_token) in vp_data
         }
 
         response_data = {
