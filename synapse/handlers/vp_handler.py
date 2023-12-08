@@ -1,10 +1,13 @@
+import base64
 import json
 import logging
 import urllib.parse
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Tuple
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 from jsonpath_ng import parse as jsonpath_parse
 from jwcrypto.jwk import JWK
 from sd_jwt.verifier import SDJWTVerifier
@@ -12,6 +15,7 @@ from sd_jwt.verifier import SDJWTVerifier
 from synapse.api.constants import VPSessionStatus, VPType
 from synapse.api.errors import SynapseError
 from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -104,6 +108,67 @@ def make_required_descriptors(
     vp_type: VPType,
 ) -> Tuple[List[Dict[str, any]], List[Dict[str, any]]]:
     return INPUT_DESCRIPTORS[vp_type], SUBMISSION_REQUIREMENTS[vp_type]
+
+
+def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
+    result = {
+        "issuer_name": "UNKNOWN",
+        "issuer_domain": "UNKNOWN",
+        "issuer_address": "UNKNOWN",
+    }
+
+    iss_claim = all_claims.get("iss", None)
+    if iss_claim is not None:
+        try:
+            result["issuer_domain"] = urlparse(iss_claim).netloc
+        except Exception as ex:
+            logger.warning("unable to get issuer domain from iss claim: %s" % ex)
+
+    def decode_base64url(s):
+        return base64.urlsafe_b64decode(s + b"=" * ((4 - len(s) & 3) & 3))
+
+    header_dict = None
+    try:
+        jwt_header = raw_vp_token.strip().split(".")[0]
+        header_dict = json.loads(decode_base64url(jwt_header.encode("ascii")))
+    except Exception as ex:
+        logger.warning("unable to get issuer info from jwt header: %s" % ex)
+
+    if header_dict is not None and "x5c" in header_dict:
+        try:
+            cert_data = header_dict["x5c"][0].encode("ascii").strip()
+            cert = x509.load_der_x509_certificate(
+                base64.b64decode(cert_data), default_backend()
+            )
+            vc_issuer_subject = cert.subject
+            org_names = vc_issuer_subject.get_attributes_for_oid(
+                x509.NameOID.ORGANIZATION_NAME
+            )
+            country_names = vc_issuer_subject.get_attributes_for_oid(
+                x509.NameOID.COUNTRY_NAME
+            )
+            state_names = vc_issuer_subject.get_attributes_for_oid(
+                x509.NameOID.STATE_OR_PROVINCE_NAME
+            )
+            locality_names = vc_issuer_subject.get_attributes_for_oid(
+                x509.NameOID.LOCALITY_NAME
+            )
+
+            sans = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            address = country_names + state_names + locality_names
+
+            if len(org_names) > 0:
+                result["issuer_name"] = org_names[0].value
+            if len(address) > 0:
+                result["issuer_address"] = " ".join([x.value for x in address])
+            if len(sans.value) > 0:
+                result["issuer_domain"] = " ".join(
+                    sans.value.get_values_for_type(x509.DNSName)
+                )
+        except Exception as ex:
+            logger.warning("unable to get issuer info from x5c: %s" % ex)
+
+    return result
 
 
 class VerifiablePresentationHandler:
