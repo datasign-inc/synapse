@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import parse_qs
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import VPType
@@ -41,7 +40,7 @@ class HandleVerifyByServer(RestServlet):
 
         # todo: check relation between requester and target_user_id
         if user_id != target_user_id:
-            logger.info(f"{user_id} is verifying {target_user_id} attribute!!!!!!!!")
+            logger.info(f"{user_id} is verifying {target_user_id} attribute")
 
         typ = VPType(vp_type)
         vp_data = await self.store.lookup_vp_data(target_user_id, typ)
