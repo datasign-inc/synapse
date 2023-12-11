@@ -1,16 +1,21 @@
+import base64
 import json
 import logging
 import urllib.parse
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List
-from urllib.parse import parse_qs
+from typing import TYPE_CHECKING, Dict, List, Tuple
+from urllib.parse import parse_qs, urlparse
 
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from jsonpath_ng import parse as jsonpath_parse
 from jwcrypto.jwk import JWK
 from sd_jwt.verifier import SDJWTVerifier
 
 from synapse.api.constants import VPSessionStatus, VPType
 from synapse.api.errors import SynapseError
 from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -18,81 +23,182 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def make_required_descriptors(vp_type: VPType):
-    if vp_type == VPType.AGE_OVER_13:
-        descriptors = [
-            {
-                "group": "A",
-                "id": "identity_credential_based_on_myna",
-                "name": "年齢が13以上であることを確認します",
-                "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
-                "format": {
-                    "vc+sd-jwt": {
-                        "alg": ["ES256", "ES256K"],
+JSON_PATH: Dict[VPType, List[str]] = {
+    VPType.AGE_OVER_13: ["$.is_older_than_13"],
+    VPType.AFFILIATION: ["$.division"],
+}
+
+SUBMISSION_REQUIREMENTS: Dict[VPType, List[Dict[str, any]]] = {
+    VPType.AGE_OVER_13: [
+        {"name": "Age over 13 years old", "rule": "pick", "count": 1, "from": "A"}
+    ],
+    VPType.AFFILIATION: [
+        {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
+    ],
+}
+
+SUBMISSION_VC_FORMAT: Dict[str, Dict[str, List[str]]] = {
+    "vc+sd-jwt": {
+        "alg": ["ES256", "ES256K"],
+    }
+}
+
+INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
+    VPType.AGE_OVER_13: [
+        {
+            "group": "A",
+            "id": "identity_credential_based_on_myna",
+            "name": "年齢が13以上であることを確認します",
+            "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
+            "format": SUBMISSION_VC_FORMAT,
+            "constraints": {
+                "fields": [
+                    {
+                        "path": JSON_PATH[VPType.AGE_OVER_13],
+                        "filter": {
+                            "type": "string",
+                            # todo: to be implemented. may be JSON Schema URL?
+                            "const": "",
+                        },
                     }
-                },
-                "constraints": {
-                    "fields": [
-                        {
-                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/proxy-vci/src/vci/identityCredential.ts#L187
-                            "path": ["$.is_older_than_13"],
-                            "filter": {
-                                "type": "string",
-                                # todo: to be implemented. may be JSON Schema URL?
-                                "const": "",
-                            },
-                        }
-                    ],
-                    # This indicates that the Conformant Consumer MUST limit
-                    # submitted fields to those listed in the fields array
-                    "limit_disclosure,": "required",
-                },
-            }
-        ]
-
-        # submission_requirements property defines which
-        # Input Descriptors are required for submission,
-        requirements = [
-            {"name": "Age over 13 years old", "rule": "pick", "count": 1, "from": "A"}
-        ]
-
-        return descriptors, requirements
-
-    if vp_type == VPType.AFFILIATION:
-        descriptors = [
-            {
-                "group": "A",
-                "id": "affiliation",
-                "name": "所属情報を確認します",
-                "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
-                "format": {
-                    "vc+sd-jwt": {
-                        "alg": ["ES256", "ES256K"],
+                ],
+                # This indicates that the Conformant Consumer MUST limit
+                # submitted fields to those listed in the fields array
+                "limit_disclosure,": "required",
+            },
+        }
+    ],
+    VPType.AFFILIATION: [
+        {
+            "group": "A",
+            "id": "affiliation",
+            "name": "所属情報を確認します",
+            "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
+            "format": SUBMISSION_VC_FORMAT,
+            "constraints": {
+                "fields": [
+                    {
+                        "path": JSON_PATH[VPType.AFFILIATION],
+                        "filter": {
+                            "type": "string",
+                            "const": "",  # todo: to be implemented
+                        },
                     }
-                },
-                "constraints": {
-                    "fields": [
-                        {
-                            # https://github.com/datasign-inc/tw2023-demo-vci/blob/e90e743a4d3ed5ff559c42a9aa4e0b1904939eea/employee-vci/src/vci/employeeCredential.ts#L50
-                            "path": ["$.division"],
-                            "filter": {
-                                "type": "string",
-                                "const": "",  # todo: to be implemented
-                            },
-                        }
-                    ],
-                    "limit_disclosure,": "required",
-                },
-            }
-        ]
+                ],
+                "limit_disclosure,": "required",
+            },
+        }
+    ],
+}
 
-        requirements = [
-            {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
-        ]
 
-        return descriptors, requirements
+def resolve_json_path(
+    vp_type: VPType, verified_claims: Dict[str, any]
+) -> Dict[str, List[any]]:
+    result = []
+    paths = JSON_PATH[vp_type]
+    for path in paths:
+        expr = jsonpath_parse(path)
+        matches = expr.find(verified_claims)
+        result.append([each.value for each in matches])
+    return dict(zip(paths, result))
 
-    raise ValueError("unexpected vp_type %s" % vp_type)
+
+def make_required_descriptors(
+    vp_type: VPType,
+) -> Tuple[List[Dict[str, any]], List[Dict[str, any]]]:
+    return INPUT_DESCRIPTORS[vp_type], SUBMISSION_REQUIREMENTS[vp_type]
+
+
+def subject_info(dn) -> Tuple:
+    org_names = dn.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
+    country_names = dn.get_attributes_for_oid(x509.NameOID.COUNTRY_NAME)
+    state_names = dn.get_attributes_for_oid(x509.NameOID.STATE_OR_PROVINCE_NAME)
+    locality_names = dn.get_attributes_for_oid(x509.NameOID.LOCALITY_NAME)
+
+    address = country_names + state_names + locality_names
+
+    return org_names, address
+
+
+def validity_period(cert) -> Tuple[str, str]:
+    try:
+        not_before = cert.not_valid_before_utc
+        not_after = cert.not_valid_after_utc
+    except Exception:
+        not_before = cert.not_valid_before
+        not_after = cert.not_valid_after
+
+    return str(not_before), str(not_after)
+
+
+def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
+    result = {
+        "issuer_name": "UNKNOWN",
+        "issuer_domain": "UNKNOWN",
+        "issuer_address": "UNKNOWN",
+        "issuer_authenticator_org_name": "UNKNOWN",
+        "issuer_authenticator_address": "UNKNOWN",
+        "not_before": "UNKNOWN",
+        "not_after": "UNKNOWN",
+    }
+
+    iss_claim = all_claims.get("iss", None)
+    if iss_claim is not None:
+        try:
+            result["issuer_domain"] = urlparse(iss_claim).netloc
+        except Exception as ex:
+            logger.warning("unable to get issuer domain from iss claim: %s" % ex)
+
+    def decode_base64url(s):
+        return base64.urlsafe_b64decode(s + b"=" * ((4 - len(s) & 3) & 3))
+
+    header_dict = None
+    try:
+        jwt_header = raw_vp_token.strip().split(".")[0]
+        header_dict = json.loads(decode_base64url(jwt_header.encode("ascii")))
+    except Exception as ex:
+        logger.warning("unable to get issuer info from jwt header: %s" % ex)
+
+    if header_dict is not None and "x5c" in header_dict:
+        try:
+            cert_data = header_dict["x5c"][0].encode("ascii").strip()
+            cert = x509.load_der_x509_certificate(
+                base64.b64decode(cert_data), default_backend()
+            )
+
+            issuer_org_names, issuer_address = subject_info(cert.subject)
+            issuer_authenticator_org_names, issuer_authenticator_address = subject_info(
+                cert.issuer
+            )
+
+            not_before, not_after = validity_period(cert)
+            sans = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+
+            if len(issuer_org_names) > 0:
+                result["issuer_name"] = issuer_org_names[0].value
+            if len(issuer_address) > 0:
+                result["issuer_address"] = " ".join([x.value for x in issuer_address])
+
+            if len(issuer_authenticator_org_names) > 0:
+                result[
+                    "issuer_authenticator_org_name"
+                ] = issuer_authenticator_org_names[0].value
+            if len(issuer_authenticator_address) > 0:
+                result["issuer_authenticator_address"] = " ".join(
+                    [x.value for x in issuer_authenticator_address]
+                )
+
+            if len(sans.value) > 0:
+                result["issuer_domain"] = " ".join(
+                    sans.value.get_values_for_type(x509.DNSName)
+                )
+            result["not_before"] = not_before
+            result["not_after"] = not_after
+        except Exception as ex:
+            logger.warning("unable to get issuer info from x5c: %s" % ex)
+
+    return result
 
 
 class VerifiablePresentationHandler:
@@ -239,7 +345,9 @@ class VerifiablePresentationHandler:
         user_id = requester.user.to_string()
         vp_type = await self._store.lookup_vp_type(sid)
 
+        main_claims = resolve_json_path(vp_type, verified_claims)
+
         await self._store.register_vp_data(
-            user_id, vp_type, verified_claims, raw_token_value
+            user_id, vp_type, main_claims, verified_claims, raw_token_value
         )
         await self._store.update_vp_session_status(sid, VPSessionStatus.POSTED)

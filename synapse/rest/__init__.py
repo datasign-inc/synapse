@@ -66,6 +66,7 @@ from synapse.rest.client import (
     voip,
     vp,
     vp_client_metadata,
+    vp_delete,
     vp_jwks,
     vp_polling,
     vp_request,
@@ -137,6 +138,7 @@ class ClientRestResource(JsonResource):
             vp_polling.register_servlets(hs, client_resource)
             vp_response.register_servlets(hs, client_resource)
             vp_client_metadata.register_servlets(hs, client_resource)
+            vp_delete.register_servlets(hs, client_resource)
         if is_main_process:
             verify_by_server.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)

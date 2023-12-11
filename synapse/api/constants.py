@@ -306,3 +306,10 @@ class SIOPv2SessionStatus(enum.Enum):
 class VPType(enum.Enum):
     AGE_OVER_13 = "ageOver13"
     AFFILIATION = "affiliation"
+
+    @property
+    def description_ja(self):
+        if self.value == "ageOver13":
+            return "13歳以上であること"
+        if self.value == "affiliation":
+            return "所属組織の情報"

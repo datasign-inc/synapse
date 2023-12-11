@@ -15,5 +15,5 @@
 
 ALTER TABLE login_tokens ADD COLUMN siopv2_sid TEXT DEFAULT '';
 
-CREATE INDEX login_tokens_siopv2_sid_idx
+CREATE INDEX IF NOT EXISTS login_tokens_siopv2_sid_idx
     ON login_tokens (siopv2_sid);
