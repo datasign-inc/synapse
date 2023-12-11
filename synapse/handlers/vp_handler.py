@@ -110,11 +110,37 @@ def make_required_descriptors(
     return INPUT_DESCRIPTORS[vp_type], SUBMISSION_REQUIREMENTS[vp_type]
 
 
+def subject_info(dn) -> Tuple:
+    org_names = dn.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
+    country_names = dn.get_attributes_for_oid(x509.NameOID.COUNTRY_NAME)
+    state_names = dn.get_attributes_for_oid(x509.NameOID.STATE_OR_PROVINCE_NAME)
+    locality_names = dn.get_attributes_for_oid(x509.NameOID.LOCALITY_NAME)
+
+    address = country_names + state_names + locality_names
+
+    return org_names, address
+
+
+def validity_period(cert) -> Tuple[str, str]:
+    try:
+        not_before = cert.not_valid_before_utc
+        not_after = cert.not_valid_after_utc
+    except Exception:
+        not_before = cert.not_valid_before
+        not_after = cert.not_valid_after
+
+    return str(not_before), str(not_after)
+
+
 def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
     result = {
         "issuer_name": "UNKNOWN",
         "issuer_domain": "UNKNOWN",
         "issuer_address": "UNKNOWN",
+        "issuer_authenticator_org_name": "UNKNOWN",
+        "issuer_authenticator_address": "UNKNOWN",
+        "not_before": "UNKNOWN",
+        "not_after": "UNKNOWN",
     }
 
     iss_claim = all_claims.get("iss", None)
@@ -140,31 +166,35 @@ def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
             cert = x509.load_der_x509_certificate(
                 base64.b64decode(cert_data), default_backend()
             )
-            vc_issuer_subject = cert.subject
-            org_names = vc_issuer_subject.get_attributes_for_oid(
-                x509.NameOID.ORGANIZATION_NAME
-            )
-            country_names = vc_issuer_subject.get_attributes_for_oid(
-                x509.NameOID.COUNTRY_NAME
-            )
-            state_names = vc_issuer_subject.get_attributes_for_oid(
-                x509.NameOID.STATE_OR_PROVINCE_NAME
-            )
-            locality_names = vc_issuer_subject.get_attributes_for_oid(
-                x509.NameOID.LOCALITY_NAME
+
+            issuer_org_names, issuer_address = subject_info(cert.subject)
+            issuer_authenticator_org_names, issuer_authenticator_address = subject_info(
+                cert.issuer
             )
 
+            not_before, not_after = validity_period(cert)
             sans = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-            address = country_names + state_names + locality_names
 
-            if len(org_names) > 0:
-                result["issuer_name"] = org_names[0].value
-            if len(address) > 0:
-                result["issuer_address"] = " ".join([x.value for x in address])
+            if len(issuer_org_names) > 0:
+                result["issuer_name"] = issuer_org_names[0].value
+            if len(issuer_address) > 0:
+                result["issuer_address"] = " ".join([x.value for x in issuer_address])
+
+            if len(issuer_authenticator_org_names) > 0:
+                result[
+                    "issuer_authenticator_org_name"
+                ] = issuer_authenticator_org_names[0].value
+            if len(issuer_authenticator_address) > 0:
+                result["issuer_authenticator_address"] = " ".join(
+                    [x.value for x in issuer_authenticator_address]
+                )
+
             if len(sans.value) > 0:
                 result["issuer_domain"] = " ".join(
                     sans.value.get_values_for_type(x509.DNSName)
                 )
+            result["not_before"] = not_before
+            result["not_after"] = not_after
         except Exception as ex:
             logger.warning("unable to get issuer info from x5c: %s" % ex)
 
