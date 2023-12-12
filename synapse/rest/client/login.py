@@ -134,7 +134,7 @@ class LoginRestServlet(RestServlet):
         # counters are initialised for the auth_provider_ids.
         _load_sso_handlers(hs)
 
-    def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
@@ -144,8 +144,14 @@ class LoginRestServlet(RestServlet):
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
+        # todo: Consider the proper conditions to activate siopv2.
         if True:
-            flows.append({"type": "m.login.siopv2"})
+            params = await self.auth_handler.get_params_siopv2()
+            flows.append(
+                {"type": "m.login.siopv2",
+                 # Below, parameters are passed in a non-standardized way: `params`
+                 # The following `identity_providers` are supposed to be the same way.
+                 "params": params})
 
         # The login token flow requires m.login.token to be advertised.
         support_login_token_flow = self._get_login_token_enabled

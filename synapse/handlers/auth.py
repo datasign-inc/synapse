@@ -749,7 +749,7 @@ class AuthHandler:
         await self.store.register_siopv2_session(sid)
         return sid
 
-    async def _get_params_siopv2(self) -> dict:
+    async def get_params_siopv2(self) -> dict:
         sid = await self._create_siopv2_session()
         base_url = self.hs.config.server.public_baseurl
 
@@ -795,7 +795,7 @@ class AuthHandler:
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
             LoginType.TERMS: self._get_params_terms,
-            LoginType.SIOPv2: self._get_params_siopv2,
+            LoginType.SIOPv2: self.get_params_siopv2,
         }
 
         params: Dict[str, Any] = {}
@@ -1175,6 +1175,8 @@ class AuthHandler:
                 types.insert(0, LoginType.PASSWORD)
         elif self._password_localdb_enabled and self._password_enabled_for_login:
             types.insert(0, LoginType.PASSWORD)
+
+        logger.info(f"supported login types : {types}")
 
         return types
 
