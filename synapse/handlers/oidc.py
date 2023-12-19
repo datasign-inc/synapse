@@ -144,6 +144,7 @@ def to_unicode(s):
 
 class SIOPv2Handler:
     def __init__(self, hs: "HomeServer"):
+        self.hs = hs
         self.base_url = hs.config.server.public_baseurl
         self._clock = hs.get_clock()
 
@@ -241,6 +242,9 @@ class SIOPv2Handler:
         except Exception:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading content")
 
+        userinfo = None
+        token = None
+
         try:
             content = parse_qs(content_bytes.decode("utf-8"))
             id_token = content.get("id_token", None)
@@ -274,13 +278,6 @@ class SIOPv2Handler:
                 siopv2_sid, SIOPv2SessionStatus.POSTED
             )
 
-            # todo: Correct to appropriate value
-            provider = self._providers.get("oidc-github")
-
-            await provider._complete_oidc_login(
-                userinfo, token, request, "", "", siopv2_sid=siopv2_sid
-            )
-
         except Exception as e:
             logger.warning(
                 "Unable to parse x-www-form-urlencoded from %s %s response: %s (%s)",
@@ -293,6 +290,26 @@ class SIOPv2Handler:
                 HTTPStatus.BAD_REQUEST,
                 "Content not JSON.",
                 errcode=Codes.BAD_SIOPv2_RESPONSE,
+            )
+
+        if userinfo is not None and token is not None:
+            base_url = self.hs.config.server.public_baseurl
+
+            # The URL to which the log-in token is passed, which is unnecessary in
+            # SIOPv2 because the log-in token is passed by polling.
+            # Therefore, set a dummy URL.
+            client_redirect_url = urllib.parse.urljoin(
+                base_url, "/_matrix/client/v3/siopv2_response/dummy_callback")
+
+            # todo: Correct to appropriate value. `oidc-github` is inappropriate.
+            provider = self._providers.get("oidc-github")
+            await provider._complete_oidc_login(
+                userinfo,
+                token,
+                request,
+                client_redirect_url,
+                "",
+                siopv2_sid=siopv2_sid
             )
 
 

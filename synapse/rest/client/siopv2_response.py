@@ -1,6 +1,8 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.errors import RedirectException
+
 from synapse.api.constants import SIOPv2SessionStatus
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
@@ -14,6 +16,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# todo: use DirectServeHtmlResource
 class HandleSIOPv2Response(RestServlet):
     PATTERNS = client_patterns("/siopv2_response/(?P<sid>[^/]*)$")
 
@@ -24,7 +27,9 @@ class HandleSIOPv2Response(RestServlet):
         self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        # 応答データを作成
+
+        logger.info("Dummy callback is called. It appears that the login token was issued successfully.")
+
         response_data = {
             "message": "Success!!",
         }
@@ -37,10 +42,14 @@ class HandleSIOPv2Response(RestServlet):
         ):
             return 400, {"message": "Bad Request"}
 
-        await self._siopv2_handler.handle_siopv2_response(request, sid)
+        try:
+            await self._siopv2_handler.handle_siopv2_response(request, sid)
+        except RedirectException as e:
+            request.setHeader(b"location", e.location)
+            request.cookies.extend(e.cookies)
+            return 302, {"Location": str(e.location)}
 
         response_data = {"message": "New endpoint data received.", "data": ""}
-
         return 200, response_data
 
 

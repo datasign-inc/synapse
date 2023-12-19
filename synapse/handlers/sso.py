@@ -179,6 +179,8 @@ class UsernameMappingSession:
     emails_to_use: StrCollection = ()
     terms_accepted_version: Optional[str] = None
 
+    siopv2_sid: Optional[str] = None
+
 
 # the HTTP cookie used to track the mapping session id
 USERNAME_MAPPING_SESSION_COOKIE_NAME = b"username_mapping_session"
@@ -494,6 +496,12 @@ class SsoHandler:
                         next_step_url,
                         extra_login_attributes,
                         auth_provider_session_id,
+
+                        # Save the siopv2 id in the session so that it can be
+                        # referenced even at the redirection destination.
+                        # Destination is specifically `register_sso_user` in
+                        # `handlers/sso.py`.
+                        siopv2_sid=siopv2_sid
                     )
 
                 user_id = await self._register_mapped_user(
@@ -619,6 +627,7 @@ class SsoHandler:
         next_step_url: bytes,
         extra_login_attributes: Optional[JsonDict],
         auth_provider_session_id: Optional[str],
+        siopv2_sid: Optional[str] = None,
     ) -> NoReturn:
         """Creates a UsernameMappingSession and redirects the browser
 
@@ -663,6 +672,7 @@ class SsoHandler:
             chosen_localpart=attributes.localpart,
             # TODO: Consider letting the user mapping provider specify defaults for
             #       other user-chosen attributes.
+            siopv2_sid=siopv2_sid
         )
 
         self._username_mapping_sessions[session_id] = session
@@ -1108,6 +1118,7 @@ class SsoHandler:
             session.extra_login_attributes,
             new_user=True,
             auth_provider_session_id=session.auth_provider_session_id,
+            siopv2_sid=session.siopv2_sid
         )
 
     def _expire_old_sessions(self) -> None:
