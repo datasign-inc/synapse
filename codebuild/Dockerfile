@@ -18,6 +18,5 @@ ENV PATH /root/.local/bin:$PATH
 
 # install synapse
 RUN git config --global --add safe.directory /usr/src/synapse
-RUN poetry lock --no-update
-RUN poetry install -v
-
+RUN poetry install --extras all
+RUN find /usr/src/synapse/build -name "synapse_rust.abi3.so" -exec cp {} /usr/src/synapse/synapse \;
