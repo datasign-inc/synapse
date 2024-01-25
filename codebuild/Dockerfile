@@ -1,6 +1,9 @@
 FROM amazonlinux:latest
 LABEL authors="sadamu"
 
+# TBD
+EXPOSE 8008
+
 WORKDIR /usr/src/synapse
 COPY . .
 
