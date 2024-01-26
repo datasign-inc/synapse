@@ -1,0 +1,26 @@
+version: 0.2
+env:
+  variables:
+    IMANGE_NAME: "synapse"
+phases:
+  pre_build:
+    commands:
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  build:
+    commands:
+      # ここからが実際にECRにpushするイメージのセットアップ
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $DEST_REPOSITORY_URI:$IMAGE_TAG -f codebuild/Dockerfile .
+      - docker tag $DEST_REPOSITORY_URI:$IMAGE_TAG $DEST_REPOSITORY_URI:latest
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $DEST_REPOSITORY_URI:$IMAGE_TAG
+      - docker push $DEST_REPOSITORY_URI:latest
+      - printf '[{"name":"synapse","imageUri":"%s"}]' $DEST_REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+artifacts:
+  files: imagedefinitions.json
