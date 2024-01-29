@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import RedirectException
@@ -37,7 +38,7 @@ class HandleSIOPv2Response(RestServlet):
         return 200, response_data  # 応答を返す
 
     async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        logger.warning("Checking session SIOPv2 Response ID: %s", sid)
+        sys.stdout.write("Checking session SIOPv2 Response ID: %s\n" % sid)
         if not await self.store.validate_siopv2_session(
             sid, SIOPv2SessionStatus.CREATED
         ):
