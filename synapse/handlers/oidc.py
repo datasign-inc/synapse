@@ -163,7 +163,7 @@ class SIOPv2Handler:
         id_token = to_unicode(token)
         jwt_parts = id_token.split(".")
         if len(jwt_parts) != 3:
-            logger.info("Invalid ID Token format")
+            logger.warning("Invalid ID Token format")
             return
 
         header, payload, signature = jwt_parts
@@ -183,35 +183,35 @@ class SIOPv2Handler:
             return
         else:
             if payload_data.get("nonce") != expected_nonce:
-                logger.info("Invalid nonce")
+                logger.warning("Invalid nonce")
                 return
 
             if payload_data.get("iss") != payload_data.get("sub"):
-                logger.info("ID Token is not self-issued")
+                logger.warning("ID Token is not self-issued")
                 return
 
             if payload_data.get("aud") != expected_aud:
-                logger.info("Invalid audience")
+                logger.warning("Invalid audience")
                 return
 
             sub_jwk = payload_data.get("sub_jwk")
 
             if not sub_jwk:
-                logger.info("sub_jwk is missing")
+                logger.warning("sub_jwk is missing")
                 return
 
             jwk_thumbprint = calculate_jwk_thumbprint(sub_jwk)
 
             if sub != jwk_thumbprint:
-                logger.info(f"Invalid sub value : {sub} != {jwk_thumbprint}")
+                logger.warning(f"Invalid sub value : {sub} != {jwk_thumbprint}")
                 return
 
             jwt = JsonWebToken(["RS256", "ES256K", "ES256"])
-            logger.info(f"public key : {sub_jwk}")
+            logger.warning(f"public key : {sub_jwk}")
             try:
                 claims = jwt.decode(id_token, key=sub_jwk, claims_cls=CodeIDToken)
             except BadSignatureError as e:
-                logger.info(f"Signature verification failed: {e}")
+                logger.warning(f"Signature verification failed: {e}")
                 return
 
         claims.validate(now=self._clock.time(), leeway=120)
@@ -224,6 +224,7 @@ class SIOPv2Handler:
         jwt = token.get("id_token")
         claims = await self._verify_siopv2_id_token(jwt, nonce, aud)
         if claims is None:
+            logger.warning("unable to verify id_token")
             raise Exception(f"Invalid token {token}")
 
         userinfo = UserInfo(claims)
@@ -240,6 +241,7 @@ class SIOPv2Handler:
             ):
                 raise Exception("Error Unexpected Content-Type")
         except Exception:
+            logger.warning("unable to read content")
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading content")
 
         userinfo = None
@@ -250,6 +252,7 @@ class SIOPv2Handler:
             id_token = content.get("id_token", None)
 
             if id_token is None or len(id_token) != 1:
+                logger.warning("id_token not found")
                 raise Exception("id_token not found")
 
             token = Token(id_token=id_token[0])
