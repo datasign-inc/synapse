@@ -1,5 +1,4 @@
 import logging
-import sys
 import urllib.parse
 from typing import TYPE_CHECKING, Tuple
 
@@ -28,7 +27,7 @@ class HandleSIOPv2Request(RestServlet):
         self._ro_signer = hs.get_oid4vc_request_object_signer()
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        sys.stdout.write("Checking session SIOPv2 Request ID: %s\n" % sid)
+        logger.info("Checking session SIOPv2 Request ID: %s\n" % sid)
         if not await self.store.validate_siopv2_session(
             sid, SIOPv2SessionStatus.CREATED
         ):
