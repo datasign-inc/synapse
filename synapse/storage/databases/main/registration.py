@@ -1848,7 +1848,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         self, sid: str, expected_status: SIOPv2SessionStatus
     ) -> bool:
         # todo: Allow reference from other functions
-        siopv2_session_timeout = 300000
+        siopv2_session_timeout = 30000000
 
         if sid == "":
             return False
