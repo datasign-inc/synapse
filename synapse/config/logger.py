@@ -329,7 +329,14 @@ def setup_logging(
         logBeginner: The Twisted logBeginner to use.
 
     """
+    logger = logging.getLogger(__name__)
+    logging.warning("=== LOG OUTPUT: A1 ===")
+    logger.warning("=== LOG OUTPUT: B1 ===")
+
     from twisted.internet import reactor
+
+    logging.warning("=== LOG OUTPUT: A2 ===")
+    logger.warning("=== LOG OUTPUT: B2 ===")
 
     log_config_path = (
         config.worker.worker_log_config
@@ -337,12 +344,25 @@ def setup_logging(
         else config.logging.log_config
     )
 
+    logging.warning("=== LOG OUTPUT: A3 ===")
+    logger.warning("=== LOG OUTPUT: B3 ===")
+
     # Perform one-time logging configuration.
     _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
+
+    logging.warning("=== LOG OUTPUT: A4 ===")
+    logger.warning("=== LOG OUTPUT: B4 ===")
+
     # Add a SIGHUP handler to reload the logging configuration, if one is available.
     from synapse.app import _base as appbase
 
+    logging.warning("=== LOG OUTPUT: A5 ===")
+    logger.warning("=== LOG OUTPUT: B5 ===")
+
     appbase.register_sighup(_reload_logging_config, log_config_path)
+
+    logging.warning("=== LOG OUTPUT: A6 ===")
+    logger.warning("=== LOG OUTPUT: B6 ===")
 
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
