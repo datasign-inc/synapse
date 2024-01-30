@@ -348,7 +348,7 @@ def setup_logging(
     logger.warning("=== LOG OUTPUT: B3 ===")
 
     # Perform one-time logging configuration.
-    _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
+    # _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
 
     logging.warning("=== LOG OUTPUT: A4 ===")
     logger.warning("=== LOG OUTPUT: B4 ===")
