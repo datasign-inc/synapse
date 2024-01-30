@@ -176,12 +176,12 @@ class SIOPv2Handler:
         )
 
         sub = payload_data.get("sub")
-        sub_type_did = sub.startswith("did:")
+        prefix_jwk_thumbprint = "urn:ietf:params:oauth:jwk-thumbprint:sha-256:"
 
-        if sub_type_did:
+        if sub.startswith("did:"):
             # todo: support did
             return
-        else:
+        elif sub.startswith(prefix_jwk_thumbprint):
             if payload_data.get("nonce") != expected_nonce:
                 logger.warning("Invalid nonce")
                 return
@@ -201,8 +201,9 @@ class SIOPv2Handler:
                 return
 
             jwk_thumbprint = calculate_jwk_thumbprint(sub_jwk)
+            thumbprint_with_prefix = prefix_jwk_thumbprint + jwk_thumbprint
 
-            if sub != jwk_thumbprint:
+            if sub != thumbprint_with_prefix:
                 logger.warning(f"Invalid sub value : {sub} != {jwk_thumbprint}")
                 return
 
@@ -213,6 +214,9 @@ class SIOPv2Handler:
             except BadSignatureError as e:
                 logger.warning(f"Signature verification failed: {e}")
                 return
+        else:
+            logger.warning("unknown sub type")
+            return
 
         claims.validate(now=self._clock.time(), leeway=120)
 
