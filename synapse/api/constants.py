@@ -306,6 +306,7 @@ class SIOPv2SessionStatus(enum.Enum):
 class VPType(enum.Enum):
     AGE_OVER_13 = "ageOver13"
     AFFILIATION = "affiliation"
+    JOIN_CONFERENCE = "joinConference"
 
     @property
     def description_ja(self):
@@ -313,3 +314,5 @@ class VPType(enum.Enum):
             return "13歳以上であること"
         if self.value == "affiliation":
             return "所属組織の情報"
+        if self.value == "joinConference":
+            return "イベントへの参加"
