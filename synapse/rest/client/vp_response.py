@@ -25,11 +25,13 @@ class HandleVpResponse(RestServlet):
         self._vp_handler = hs.get_verifiable_presentation_handler()
 
     async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
         if not await self.store.validate_vp_session(sid, VPSessionStatus.CREATED):
+            logger.warning("Invalid session ID: %s", sid)
             return 400, {"message": "Bad Request"}
 
         token_value, claims = await self._vp_handler.handle_vp_response(request, sid)
-        await self._vp_handler.register_claims(request, sid, token_value, claims)
+        await self._vp_handler.register_claims(requester, sid, token_value, claims)
 
         return 200, {}
 

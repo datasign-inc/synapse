@@ -31,6 +31,7 @@ class HandleVpRequest(RestServlet):
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
         if not await self.store.validate_vp_session(sid, VPSessionStatus.CREATED):
+            logger.warning("Invalid session ID: %s", sid)
             return 400, {"message": "Bad Request"}
 
         await self._ro_signer.setup_signing_key(self.ro_signing_kid)
