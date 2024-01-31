@@ -55,6 +55,7 @@ class HandleSIOPv2Request(RestServlet):
             "redirect_uri": redirect_uri,
             "nonce": nonce,
             "response_type": "id_token",
+            "response_mode": "post",# todo: support same-device flow
             "scope": "openid",
             "aud": "https://self-issued.me/v2",
         }
