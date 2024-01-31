@@ -315,4 +315,4 @@ class VPType(enum.Enum):
         if self.value == "affiliation":
             return "所属組織の情報"
         if self.value == "joinConference":
-            return "イベントへの参加"
+            return "イベント参加"
