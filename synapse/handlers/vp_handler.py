@@ -297,6 +297,7 @@ class VerifiablePresentationHandler:
             len(content_type_list) != 1
             or content_type_list[0] != "application/x-www-form-urlencoded"
         ):
+            logger.warning("content-type is not application/x-www-form-urlencoded")
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Error Unexpected Content-Type")
 
         # get vp_token and presentation_submission from request
@@ -305,14 +306,17 @@ class VerifiablePresentationHandler:
             vp_token = content.get("vp_token", None)
             presentation_submission = content.get("presentation_submission", None)
         except Exception:
+            logger.warning("Error parsing request body")
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Error parsing request body")
 
         # check number of vp_token and presentation_submission
         if vp_token is None or len(vp_token) != 1:
+            logger.warning("Only one vp_token is assumed to exist.")
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Only one vp_token is assumed to exist."
             )
         if presentation_submission is None or len(presentation_submission) != 1:
+            logger.warning("Only one presentation_submission is assumed to exist.")
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Only one presentation_submission is assumed to exist.",

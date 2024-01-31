@@ -26,6 +26,7 @@ class HandleVpResponse(RestServlet):
 
     async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         if not await self.store.validate_vp_session(sid, VPSessionStatus.CREATED):
+            logger.warning("Invalid session ID: %s", sid)
             return 400, {"message": "Bad Request"}
 
         token_value, claims = await self._vp_handler.handle_vp_response(request, sid)
