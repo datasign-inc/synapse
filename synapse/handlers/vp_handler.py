@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 JSON_PATH: Dict[VPType, List[str]] = {
     VPType.AGE_OVER_13: ["$.is_older_than_13"],
     VPType.AFFILIATION: ["$.division"],
+    VPType.JOIN_CONFERENCE: ["$.vc.credentialSubject.name"]
 }
 
 SUBMISSION_REQUIREMENTS: Dict[VPType, List[Dict[str, any]]] = {
@@ -35,11 +36,20 @@ SUBMISSION_REQUIREMENTS: Dict[VPType, List[Dict[str, any]]] = {
     VPType.AFFILIATION: [
         {"name": "Affiliation", "rule": "pick", "count": 1, "from": "A"}
     ],
+    VPType.JOIN_CONFERENCE: [
+        {"name": "Conference Participation", "rule": "pick", "count": 1, "from": "A"}
+    ]
 }
 
-SUBMISSION_VC_FORMAT: Dict[str, Dict[str, List[str]]] = {
+SUBMISSION_VC_FORMAT_SD_JWT: Dict[str, Dict[str, List[str]]] = {
     "vc+sd-jwt": {
         "alg": ["ES256", "ES256K"],
+    }
+}
+
+SUBMISSION_VC_FORMAT_JWT_VC_JSON: Dict[str, Dict[str, List[str]]] = {
+    "jwt_vc_json": {
+        "alg": ["ES256"]
     }
 }
 
@@ -49,8 +59,8 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
             "group": "A",
             "id": "identity_credential_based_on_myna",
             "name": "年齢が13以上であることを確認します",
-            "purpose": "Matrixの機能を全て利用するためには、年齢の確認が必要です",
-            "format": SUBMISSION_VC_FORMAT,
+            "purpose": "Matrix利用者に自身の年齢に関する情報を提示することができるようになります",
+            "format": SUBMISSION_VC_FORMAT_SD_JWT,
             "constraints": {
                 "fields": [
                     {
@@ -74,7 +84,7 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
             "id": "affiliation",
             "name": "所属情報を確認します",
             "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
-            "format": SUBMISSION_VC_FORMAT,
+            "format": SUBMISSION_VC_FORMAT_SD_JWT,
             "constraints": {
                 "fields": [
                     {
@@ -89,6 +99,27 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
             },
         }
     ],
+    VPType.JOIN_CONFERENCE: [
+        {
+            "group": "A",
+            "id": "joinConference",
+            "name": "カンファレンスへの参加を確認します",
+            "purpose": "Matrix利用者にカンファレンスへの参加を提示することができるようになります",
+            "format": SUBMISSION_VC_FORMAT_JWT_VC_JSON,
+            "constraints": {
+                "fields": [
+                    {
+                        "path": JSON_PATH[VPType.JOIN_CONFERENCE],
+                        "filter": {
+                            "type": "string",
+                            "const": "",  # todo: to be implemented
+                        },
+                    }
+                ],
+                "limit_disclosure,": "required",
+            },
+        }
+    ]
 }
 
 
