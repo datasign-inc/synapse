@@ -330,7 +330,7 @@ class ProfileWorkerStore(SQLBaseStore):
         self, sid: str, expected_status: VPSessionStatus
     ) -> bool:
         # todo: Allow reference from other functions
-        vp_session_timeout = 300000
+        vp_session_timeout = 30000000
 
         if sid == "":
             return False
