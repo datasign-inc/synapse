@@ -233,6 +233,51 @@ def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
 
     return result
 
+def get_issuer_public_key_from_certificate(pem_cert: str) -> JWK:
+    return JWK.from_pem(pem_cert.encode("utf8"))
+
+def get_certificate_chain_from_header(header: dict) -> List[str]:
+    x5c = header.get("x5c", None)
+    x5u = header.get("x5u", None)
+    chain = []
+
+    if not (x5c is None or len(x5c) < 1):
+        chain = [x509_certificate_prefix + "\n" +
+                 each + "\n" +
+                 x509_certificate_suffix
+                 for each in x5c]
+    elif x5u is not None:
+        logger.warning("x5c is not present, but x5u is present: %s" % x5u)
+        try:
+            assert isinstance(x5u, str)
+            response = requests.get(x5u, timeout=(2, 3))
+            if response.status_code == "200":
+                tmp = [each.strip() for each in
+                       response.content.decode("ascii").split(x509_certificate_suffix)]
+                for cert in tmp:
+                    if cert != "":
+                        chain.append(cert + "\n" + x509_certificate_suffix)
+        except:
+            logger.warning("Unable to retrieve certificate from x5u url: %s" % x5u)
+
+    return chain
+
+def get_issuer_public_key(iss: str, header: dict) -> JWK:
+
+    chain = get_certificate_chain_from_header(header)
+
+    if len(chain) == 0:
+        raise Exception("Public key cannot be obtained from either x5c or x5u")
+
+    # todo: verify certificate chain
+
+    public_key = get_issuer_public_key_from_certificate(chain[0])
+
+    # todo: Retrieve the key from `iss` and verify that it matches the one in x5c
+    # public_from_iss = ...
+
+    return public_key
+
 x509_certificate_prefix = "-----BEGIN CERTIFICATE-----"
 x509_certificate_suffix = "-----END CERTIFICATE-----"
 
@@ -243,46 +288,6 @@ class VerifiablePresentationHandler:
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
 
-    def _get_issuer_public_key_from_certificate(self, pem_cert: str) -> JWK:
-        return JWK.from_pem(pem_cert.encode("utf8"))
-
-    def get_issuer_public_key(self, iss: str, header: dict) -> JWK:
-        x5c = header.get("x5c", None)
-        x5u = header.get("x5u", None)
-
-        chain = []
-
-        if not (x5c is None or len(x5c) < 1):
-            chain = [x509_certificate_prefix + "\n" +
-                     each + "\n" +
-                     x509_certificate_suffix
-                     for each in x5c]
-        elif x5u is not None:
-            logger.warning("x5c is not present, but x5u is present: %s" % x5u)
-            try:
-                assert isinstance(x5u, str)
-                response = requests.get(x5u, timeout=(2, 3))
-                if response.status_code == "200":
-                    tmp = [each.strip() for each in
-                           response.content.decode("ascii").split(x509_certificate_suffix)]
-                    for cert in tmp:
-                        if cert != "":
-                            chain.append(cert + "\n" + x509_certificate_suffix)
-            except:
-                logger.warning("Unable to retrieve certificate from x5u url: %s" % x5u)
-
-        if len(chain) == 0:
-            raise Exception("Public key cannot be obtained from either x5c or x5u")
-
-        # todo: verify certificate chain
-
-        public_key = self._get_issuer_public_key_from_certificate(chain[0])
-
-        # todo: Retrieve the key from `iss` and verify that it matches the one in x5c
-        # public_from_iss = ...
-
-        return public_key
-
     def _verify_vp_token(
         self, format: str, vp_token: str, expected_aud: str, expected_nonce: str
     ) -> dict:
@@ -290,7 +295,7 @@ class VerifiablePresentationHandler:
             if format == "vc+sd-jwt":
                 verifier = SDJWTVerifier(
                     vp_token,
-                    self.get_issuer_public_key,
+                    get_issuer_public_key,
                     expected_aud=expected_aud,
                     expected_nonce=expected_nonce,
                 )
@@ -298,7 +303,7 @@ class VerifiablePresentationHandler:
             elif format == "jwt_vc_json":
                 parts = vp_token.split(".")
                 header = json.loads(decode_base64url(parts[0].strip().encode("ascii")))
-                key = self.get_issuer_public_key("dummy", header)
+                key = get_issuer_public_key("dummy", header)
                 jwt = JsonWebToken(["RS256", "ES256K", "ES256"])
                 claims = jwt.decode(vp_token, key=key.export_public(as_dict=True))
                 return claims
