@@ -17,7 +17,7 @@ from sd_jwt.verifier import SDJWTVerifier
 from synapse.api.constants import VPSessionStatus, VPType
 from synapse.api.errors import SynapseError
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict
+from synapse.types import JsonDict, Requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -168,6 +168,7 @@ def validity_period(cert) -> Tuple[str, str]:
 def decode_base64url(s):
     return base64.urlsafe_b64decode(s + b"=" * ((4 - len(s) & 3) & 3))
 
+
 def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
     result = {
         "issuer_name": "UNKNOWN",
@@ -193,11 +194,12 @@ def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
     except Exception as ex:
         logger.warning("unable to get issuer info from jwt header: %s" % ex)
 
-    if header_dict is not None and "x5c" in header_dict:
+    if header_dict is not None:
         try:
-            cert_data = header_dict["x5c"][0].encode("ascii").strip()
-            cert = x509.load_der_x509_certificate(
-                base64.b64decode(cert_data), default_backend()
+            chain = get_certificate_chain_from_header(header_dict)
+            cert_data = chain[0].encode("ascii").strip()
+            cert = x509.load_pem_x509_certificate(
+                cert_data, default_backend()
             )
 
             issuer_org_names, issuer_address = subject_info(cert.subject)
@@ -229,12 +231,14 @@ def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
             result["not_before"] = not_before
             result["not_after"] = not_after
         except Exception as ex:
-            logger.warning("unable to get issuer info from x5c: %s" % ex)
+            logger.warning("unable to get issuer info from: %s" % ex)
 
     return result
 
+
 def get_issuer_public_key_from_certificate(pem_cert: str) -> JWK:
     return JWK.from_pem(pem_cert.encode("utf8"))
+
 
 def get_certificate_chain_from_header(header: dict) -> List[str]:
     x5c = header.get("x5c", None)
@@ -251,13 +255,16 @@ def get_certificate_chain_from_header(header: dict) -> List[str]:
         try:
             assert isinstance(x5u, str)
             response = requests.get(x5u, timeout=(2, 3))
-            if response.status_code == "200":
+            if response.status_code == 200:
                 tmp = [each.strip() for each in
                        response.content.decode("ascii").split(x509_certificate_suffix)]
                 for cert in tmp:
                     if cert != "":
                         chain.append(cert + "\n" + x509_certificate_suffix)
-        except:
+            else:
+                logger.warning("http status code : %s" % response.status_code)
+        except Exception as ex:
+            logger.warning("Exception occurred: %s" % ex)
             logger.warning("Unable to retrieve certificate from x5u url: %s" % x5u)
 
     return chain
@@ -278,8 +285,10 @@ def get_issuer_public_key(iss: str, header: dict) -> JWK:
 
     return public_key
 
+
 x509_certificate_prefix = "-----BEGIN CERTIFICATE-----"
 x509_certificate_suffix = "-----END CERTIFICATE-----"
+
 
 class VerifiablePresentationHandler:
     def __init__(self, hs: "HomeServer"):
@@ -310,7 +319,8 @@ class VerifiablePresentationHandler:
             else:
                 logger.warning("Unknown format: %s" % format)
                 return {}
-        except Exception:
+        except Exception as ex:
+            logger.warning("Exception %s occurred while verifying vp_token" % ex)
             logger.warning("Unable to verify vp_token %s" % vp_token)
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Unable to verify vp_token")
 
@@ -429,12 +439,11 @@ class VerifiablePresentationHandler:
 
     async def register_claims(
         self,
-        request: SynapseRequest,
+        requester: Requester,
         sid: str,
         raw_token_value: str,
         verified_claims: dict,
     ) -> None:
-        requester = await self._auth.get_user_by_req(request)
 
         user_id = requester.user.to_string()
         vp_type = await self._store.lookup_vp_type(sid)
