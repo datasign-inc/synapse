@@ -5,7 +5,9 @@ import urllib.parse
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Tuple
 from urllib.parse import parse_qs, urlparse
+from authlib.jose import JsonWebToken
 
+import requests
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from jsonpath_ng import parse as jsonpath_parse
@@ -163,6 +165,9 @@ def validity_period(cert) -> Tuple[str, str]:
     return str(not_before), str(not_after)
 
 
+def decode_base64url(s):
+    return base64.urlsafe_b64decode(s + b"=" * ((4 - len(s) & 3) & 3))
+
 def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
     result = {
         "issuer_name": "UNKNOWN",
@@ -180,9 +185,6 @@ def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
             result["issuer_domain"] = urlparse(iss_claim).netloc
         except Exception as ex:
             logger.warning("unable to get issuer domain from iss claim: %s" % ex)
-
-    def decode_base64url(s):
-        return base64.urlsafe_b64decode(s + b"=" * ((4 - len(s) & 3) & 3))
 
     header_dict = None
     try:
@@ -231,6 +233,8 @@ def extract_issuer_info(all_claims: JsonDict, raw_vp_token: str) -> JsonDict:
 
     return result
 
+x509_certificate_prefix = "-----BEGIN CERTIFICATE-----"
+x509_certificate_suffix = "-----END CERTIFICATE-----"
 
 class VerifiablePresentationHandler:
     def __init__(self, hs: "HomeServer"):
@@ -244,30 +248,65 @@ class VerifiablePresentationHandler:
 
     def get_issuer_public_key(self, iss: str, header: dict) -> JWK:
         x5c = header.get("x5c", None)
+        x5u = header.get("x5u", None)
 
-        if x5c is None or len(x5c) < 1:
-            raise Exception("x5c not found in JWT header")
+        chain = []
 
-        pubkey_from_x5c = self._get_issuer_public_key_from_certificate(x5c[0])
+        if not (x5c is None or len(x5c) < 1):
+            chain = [x509_certificate_prefix + "\n" +
+                     each + "\n" +
+                     x509_certificate_suffix
+                     for each in x5c]
+        elif x5u is not None:
+            logger.warning("x5c is not present, but x5u is present: %s" % x5u)
+            try:
+                assert isinstance(x5u, str)
+                response = requests.get(x5u, timeout=(2, 3))
+                if response.status_code == "200":
+                    tmp = [each.strip() for each in
+                           response.content.decode("ascii").split(x509_certificate_suffix)]
+                    for cert in tmp:
+                        if cert != "":
+                            chain.append(cert + "\n" + x509_certificate_suffix)
+            except:
+                logger.warning("Unable to retrieve certificate from x5u url: %s" % x5u)
+
+        if len(chain) == 0:
+            raise Exception("Public key cannot be obtained from either x5c or x5u")
+
+        # todo: verify certificate chain
+
+        public_key = self._get_issuer_public_key_from_certificate(chain[0])
 
         # todo: Retrieve the key from `iss` and verify that it matches the one in x5c
-        # pubkey_from_iss = ...
+        # public_from_iss = ...
 
-        return pubkey_from_x5c
+        return public_key
 
     def _verify_vp_token(
-        self, vp_token: str, expected_aud: str, expected_nonce: str
+        self, format: str, vp_token: str, expected_aud: str, expected_nonce: str
     ) -> dict:
         try:
-            verifier = SDJWTVerifier(
-                vp_token,
-                self.get_issuer_public_key,
-                expected_aud=expected_aud,
-                expected_nonce=expected_nonce,
-            )
-            return verifier.get_verified_payload()
+            if format == "vc+sd-jwt":
+                verifier = SDJWTVerifier(
+                    vp_token,
+                    self.get_issuer_public_key,
+                    expected_aud=expected_aud,
+                    expected_nonce=expected_nonce,
+                )
+                return verifier.get_verified_payload()
+            elif format == "jwt_vc_json":
+                parts = vp_token.split(".")
+                header = json.loads(decode_base64url(parts[0].strip().encode("ascii")))
+                key = self.get_issuer_public_key("dummy", header)
+                jwt = JsonWebToken(["RS256", "ES256K", "ES256"])
+                claims = jwt.decode(vp_token, key=key.export_public(as_dict=True))
+                return claims
+            else:
+                logger.warning("Unknown format: %s" % format)
+                return {}
         except Exception:
-            logger.info("Unable to verify vp_token %s" % vp_token)
+            logger.warning("Unable to verify vp_token %s" % vp_token)
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Unable to verify vp_token")
 
     def _verify_descriptor_map(
@@ -278,7 +317,7 @@ class VerifiablePresentationHandler:
             try:
                 dm_id = target["id"]
                 dm_format = target["format"]
-                dm_path = target["path"]
+                _ = target["path"]
             except KeyError as e:
                 logger.warning("Key %s not found in descriptor_map" % e.args[0])
                 raise SynapseError(
@@ -297,18 +336,11 @@ class VerifiablePresentationHandler:
                 )
 
     def _verify_presentation_submission(
-        self, sid: str, vp_type: VPType, presentation_submission: str
+        self, sid: str, vp_type: VPType, presentation_submission_dict: dict
     ) -> None:
-        try:
-            presentation_submission_dict = json.loads(presentation_submission)
-        except Exception:
-            logger.warning("Unable to parse presentation_submission")
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Unable to parse presentation_submission"
-            )
 
         try:
-            presentation_submission_dict["id"]
+            _ = presentation_submission_dict["id"]
             ps_definition_id = presentation_submission_dict["definition_id"]
             ps_descriptor_map = presentation_submission_dict["descriptor_map"]
         except KeyError as e:
@@ -324,6 +356,13 @@ class VerifiablePresentationHandler:
                 HTTPStatus.BAD_REQUEST, "definition_id must equal to %s" % sid
             )
         self._verify_descriptor_map(sid, vp_type, ps_descriptor_map)
+
+    def _get_credential_format(self, presentation_submission_dict: dict):
+        ps_descriptor_map = presentation_submission_dict["descriptor_map"]
+
+        # todo: 要素が複数ある場合を考慮すべき
+        dm_format = ps_descriptor_map[0]["format"]
+        return dm_format
 
     async def handle_vp_response(self, request: SynapseRequest, sid: str):
         content_type_list = request.requestHeaders.getRawHeaders("Content-Type")
@@ -366,9 +405,19 @@ class VerifiablePresentationHandler:
         raw_token_value = vp_token[0]
         vp_type = await self._store.lookup_vp_type(sid)
 
-        self._verify_presentation_submission(sid, vp_type, presentation_submission[0])
+        try:
+            presentation_submission_dict = json.loads(presentation_submission[0])
+        except Exception:
+            logger.warning("Unable to parse presentation_submission")
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Unable to parse presentation_submission"
+            )
+
+        self._verify_presentation_submission(sid, vp_type, presentation_submission_dict)
+
+        format = self._get_credential_format(presentation_submission_dict)
         verified_claims = self._verify_vp_token(
-            raw_token_value, expected_aud, expected_nonce
+            format, raw_token_value, expected_aud, expected_nonce
         )
 
         return raw_token_value, verified_claims
