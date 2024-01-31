@@ -280,6 +280,7 @@ class VerifiablePresentationHandler:
                 dm_format = target["format"]
                 dm_path = target["path"]
             except KeyError as e:
+                logger.warning("Key %s not found in descriptor_map" % e.args[0])
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "Key %s not found in descriptor_map" % e.args[0],
@@ -290,6 +291,7 @@ class VerifiablePresentationHandler:
                     check = True
                     break
             if not check:
+                logger.warning("descriptor_map id or format is invalid")
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST, "descriptor_map id or format is invalid"
                 )
@@ -300,6 +302,7 @@ class VerifiablePresentationHandler:
         try:
             presentation_submission_dict = json.loads(presentation_submission)
         except Exception:
+            logger.warning("Unable to parse presentation_submission")
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Unable to parse presentation_submission"
             )
@@ -309,12 +312,14 @@ class VerifiablePresentationHandler:
             ps_definition_id = presentation_submission_dict["definition_id"]
             ps_descriptor_map = presentation_submission_dict["descriptor_map"]
         except KeyError as e:
+            logger.warning("Key %s not found in presentation_submission" % e.args[0])
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Key %s not found in presentation_submission" % e.args[0],
             )
 
         if ps_definition_id != sid:
+            logger.warning("definition_id must equal to %s" % sid)
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "definition_id must equal to %s" % sid
             )
