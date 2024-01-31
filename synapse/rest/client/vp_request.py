@@ -53,7 +53,7 @@ class HandleVpRequest(RestServlet):
             "client_id_scheme": "x509_san_dns",
             "response_uri": client_id,
             "nonce": ro_nonce,
-            "response_mode": "post",
+            "response_mode": "direct_post",
             "response_type": "vp_token",
             "presentation_definition": {
                 "id": sid,
