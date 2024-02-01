@@ -306,7 +306,8 @@ class SIOPv2Handler:
             # SIOPv2 because the log-in token is passed by polling.
             # Therefore, set a dummy URL.
             client_redirect_url = urllib.parse.urljoin(
-                base_url, "/_matrix/client/v3/siopv2_response/dummy_callback")
+                base_url,
+                "/_matrix/client/v3/siopv2_response/%s" % siopv2_sid)
 
             # todo: Correct to appropriate value. `oidc-github` is inappropriate.
             provider = self._providers.get("oidc-github")

@@ -24,7 +24,7 @@ class HandleSIOPv2Polling(RestServlet):
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         if not await self.store.validate_siopv2_session(
-            sid, SIOPv2SessionStatus.POSTED
+            sid, SIOPv2SessionStatus.AUTHORIZED
         ):
             return 400, {"message": "Bad Request"}
 

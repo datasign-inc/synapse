@@ -28,13 +28,21 @@ class HandleSIOPv2Response(RestServlet):
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
 
-        logger.info("Dummy callback is called. It appears that the login token was issued successfully.")
+        if not await self.store.validate_siopv2_session(
+            sid, SIOPv2SessionStatus.POSTED
+        ):
+            logger.warning("Invalid session ID: %s", sid)
+            return 400, {"message": "Bad Request"}
+
+        await self.store.update_siopv2_session_status(
+            sid, SIOPv2SessionStatus.AUTHORIZED
+        )
 
         response_data = {
-            "message": "Success!!",
+            "message": "Please go back to the application!!",
         }
 
-        return 200, response_data  # 応答を返す
+        return 200, response_data
 
     async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         logger.info("Checking session SIOPv2 Response ID: %s\n" % sid)
@@ -51,8 +59,8 @@ class HandleSIOPv2Response(RestServlet):
             request.cookies.extend(e.cookies)
             return 302, {"Location": str(e.location)}
 
-        response_data = {"message": "New endpoint data received.", "data": ""}
-        return 200, response_data
+        logger.warning("Unable to complete login with SIOPv2")
+        return 400, {"message": "Unable to complete login with SIOPv2"}
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

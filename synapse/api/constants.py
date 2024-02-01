@@ -300,6 +300,7 @@ class VPSessionStatus(enum.Enum):
 class SIOPv2SessionStatus(enum.Enum):
     CREATED = "created"
     POSTED = "posted"
+    AUTHORIZED = "authorized"
     INVALIDATED = "invalidated"
 
 
