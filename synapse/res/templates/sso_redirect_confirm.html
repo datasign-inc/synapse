@@ -31,7 +31,9 @@
 </header>
 <main>
     {% include "sso_partial_profile.html" %}
-    <p class="confirm-trust">Continuing will grant <strong>{{ display_url }}</strong> access to your account.</p>
+    {% if not is_siopv2 %}
+        <p class="confirm-trust">Continuing will grant <strong>{{ display_url }}</strong> access to your account.</p>
+    {% endif %}
     <a href="{{ redirect_url }}" class="primary-button">Continue</a>
 </main>
 {% include "sso_footer.html" without context %}
