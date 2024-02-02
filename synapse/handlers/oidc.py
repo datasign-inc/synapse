@@ -273,6 +273,11 @@ class SIOPv2Handler:
                     siopv2_sid,
                 ]
             )
+
+            # WIP ###########################################
+            expected_aud = "https://ownd-project.com:8008/"
+            #################################################
+
             logger.info("creation ok")
 
             userinfo = await self._verify_token(
