@@ -51,7 +51,12 @@ class HandleSIOPv2Request(RestServlet):
 
         payload = {
             "iss": redirect_uri,
-            "client_id": redirect_uri,
+
+            # "client_id": redirect_uri,
+            # WIP ######################
+            "client_id": "https://ownd-project.com:8008/",
+            ############################
+
             "redirect_uri": redirect_uri,
             "nonce": nonce,
             "response_type": "id_token",
