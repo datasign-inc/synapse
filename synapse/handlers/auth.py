@@ -1869,6 +1869,7 @@ class AuthHandler:
             new_user=new_user,
             user_id=registered_user_id,
             user_profile=user_profile_data,
+            is_siopv2=siopv2_sid is not None,
         )
         respond_with_html(request, 200, html)
 
