@@ -57,7 +57,7 @@ class HandleSIOPv2Response(RestServlet):
         except RedirectException as e:
             request.setHeader(b"location", e.location)
             request.cookies.extend(e.cookies)
-            return 302, {"Location": str(e.location)}
+            return 302, {"Location": e.location.decode("utf8")}
 
         logger.warning("Unable to complete login with SIOPv2")
         return 400, {"message": "Unable to complete login with SIOPv2"}
