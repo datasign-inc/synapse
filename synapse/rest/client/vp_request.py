@@ -49,7 +49,9 @@ class HandleVpRequest(RestServlet):
         input_descriptors, requirements = make_required_descriptors(vp_type)
 
         payload = {
-            "client_id": client_id,
+            ### WIP
+            "client_id": "https://ownd-project.com:8008/",
+
             "client_id_scheme": "x509_san_dns",
             "response_uri": client_id,
             "nonce": ro_nonce,

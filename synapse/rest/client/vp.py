@@ -41,6 +41,8 @@ class HandleVpInitiation(RestServlet):
         client_id = urllib.parse.urljoin(
             self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])
         )
+        ### WIP
+        client_id = "https://ownd-project.com:8008/"
 
         request_uri = urllib.parse.urljoin(
             self.base_url, "/".join(["/_matrix/client/v3/vp_request", sid])
