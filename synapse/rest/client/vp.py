@@ -32,15 +32,17 @@ class HandleVpInitiation(RestServlet):
         self, request: SynapseRequest, vp_type: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
-        # todo: Add user_id and session binding.
+        user_id = requester.user.to_string()
 
         sid = random_string(32)
         ro_nonce = random_string(8)
-        await self.store.register_vp_session(sid, VPType(vp_type), ro_nonce)
+        await self.store.register_vp_session(sid, VPType(vp_type), ro_nonce, user_id)
 
         client_id = urllib.parse.urljoin(
             self.base_url, "/".join(["/_matrix/client/v3/vp_response", sid])
         )
+        ### WIP
+        client_id = "https://ownd-project.com:8008/"
 
         request_uri = urllib.parse.urljoin(
             self.base_url, "/".join(["/_matrix/client/v3/vp_request", sid])

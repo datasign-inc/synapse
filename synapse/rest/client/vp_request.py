@@ -29,7 +29,6 @@ class HandleVpRequest(RestServlet):
         self.base_url = self.hs.config.server.public_baseurl
 
     async def on_GET(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
         if not await self.store.validate_vp_session(sid, VPSessionStatus.CREATED):
             logger.warning("Invalid session ID: %s", sid)
             return 400, {"message": "Bad Request"}
@@ -50,7 +49,9 @@ class HandleVpRequest(RestServlet):
         input_descriptors, requirements = make_required_descriptors(vp_type)
 
         payload = {
-            "client_id": client_id,
+            ### WIP
+            "client_id": "https://ownd-project.com:8008/",
+
             "client_id_scheme": "x509_san_dns",
             "response_uri": client_id,
             "nonce": ro_nonce,

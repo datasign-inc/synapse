@@ -221,7 +221,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def register_vp_session(
-        self, sid: str, vp_type: VPType, ro_nonce: str
+        self, sid: str, vp_type: VPType, ro_nonce: str, user_id: str
     ) -> None:
         await self.db_pool.simple_insert(
             table="vp_session_management",
@@ -230,6 +230,7 @@ class ProfileWorkerStore(SQLBaseStore):
                 "vp_type": vp_type.value,
                 "status": "created",
                 "ro_nonce": ro_nonce,
+                "user_id": user_id,
                 "created_ts": self._clock.time_msec(),
             },
             desc="register_vp_session",
@@ -289,6 +290,20 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="lookup_vp_data",
         )
         return [(x[0], json.loads(x[1]), json.loads(x[2]), x[3]) for x in ret]
+
+    async def lookup_vp_userid(
+        self, sid: str
+    ) -> Optional[str]:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="vp_session_management",
+                keyvalues={"sid": sid},
+                retcols=["user_id"],
+            )
+        except StoreError:
+            return None
+        (user_id,) = ret
+        return user_id
 
     async def lookup_vp_ro_nonce(self, sid: str) -> Optional[str]:
         try:
