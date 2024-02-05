@@ -439,13 +439,16 @@ class VerifiablePresentationHandler:
 
     async def register_claims(
         self,
-        requester: Requester,
         sid: str,
         raw_token_value: str,
         verified_claims: dict,
     ) -> None:
 
-        user_id = requester.user.to_string()
+        user_id = await self._store.lookup_vp_userid(sid)
+
+        if user_id is None or user_id == "":
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Unknown user_id")
+
         vp_type = await self._store.lookup_vp_type(sid)
 
         main_claims = resolve_json_path(vp_type, verified_claims)
