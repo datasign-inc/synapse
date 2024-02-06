@@ -58,7 +58,7 @@ SUBMISSION_VC_FORMAT_JWT_VC_JSON: Dict[str, Dict[str, List[str]]] = {
 INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
     VPType.AGE_OVER_13: [
         {
-            "group": "A",
+            "group": ["A"],
             "id": "identity_credential_based_on_myna",
             "name": "年齢が13以上であることを確認します",
             "purpose": "Matrix利用者に自身の年齢に関する情報を提示することができるようになります",
@@ -82,7 +82,7 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
     ],
     VPType.AFFILIATION: [
         {
-            "group": "A",
+            "group": ["A"],
             "id": "affiliation",
             "name": "所属情報を確認します",
             "purpose": "Matrix利用者に自身の所属を提示することができるようになります",
@@ -103,7 +103,7 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
     ],
     VPType.JOIN_CONFERENCE: [
         {
-            "group": "A",
+            "group": ["A"],
             "id": "joinConference",
             "name": "カンファレンスへの参加を確認します",
             "purpose": "Matrix利用者にカンファレンスへの参加を提示することができるようになります",
