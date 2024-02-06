@@ -32,7 +32,7 @@ class HandleVpResponse(RestServlet):
         token_value, claims = await self._vp_handler.handle_vp_response(request, sid)
         await self._vp_handler.register_claims(sid, token_value, claims)
 
-        return 200, {"message": "Registration ended successfully"}
+        return 200, {"message": "Registration ended successfully. Currently, wallet is not required to perform any further steps."}
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
