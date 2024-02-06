@@ -1058,6 +1058,24 @@ class DatabasePool:
 
         return await self.runInteraction(desc, interaction)
 
+
+    async def execute_for_insert(self, desc: str, query: str, *args: Any) -> None:
+        """Runs a single query for a result set.
+
+        Args:
+            desc: description of the transaction, for logging and metrics
+            query - The query string to execute
+            *args - Query args.
+        Returns:
+            The result of decoder(results)
+        """
+
+        def interaction(txn: LoggingTransaction):
+            txn.execute(query, args)
+
+        await self.runInteraction(desc, interaction)
+        return
+
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
 

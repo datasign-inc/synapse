@@ -255,7 +255,7 @@ class ProfileWorkerStore(SQLBaseStore):
          FROM user_vp_data WHERE user_id = ? AND vp_type = ?),
         ?, ?, ?, ?)
         """
-        await self.db_pool.execute(
+        await self.db_pool.execute_for_insert(
             "register_user_vp_data",
             sql,
             user_id,
