@@ -328,6 +328,11 @@ class VerifiablePresentationHandler:
         self, sid: str, vp_type: VPType, verification_target: List[dict]
     ) -> None:
         descriptor_choices, _ = make_required_descriptors(vp_type)
+
+        logger.warning("!!! sid : %s" % sid)
+        logger.warning("!!! verification target : %s" % verification_target)
+        logger.warning("!!! descriptor_choices : %s" % descriptor_choices)
+
         for target in verification_target:
             try:
                 dm_id = target["id"]
@@ -340,10 +345,15 @@ class VerifiablePresentationHandler:
                     "Key %s not found in descriptor_map" % e.args[0],
                 )
             check = False
+            logger.warning("!!! dm_id: %s, dm_format: %s" % (dm_id, dm_format))
             for choice in descriptor_choices:
+                logger.warning("!!! choice : %s" % choice)
                 if choice["id"] == dm_id and dm_format in choice["format"]:
                     check = True
                     break
+                else:
+                    logger.warning("!!! choice[\"id\"] != dm_id or dm_format not in choice[\"format\"]")
+                    logger.warning("!!! %s != %s or %s not in %s" % (choice["id"], dm_id, dm_format, choice["format"]))
             if not check:
                 logger.warning("descriptor_map id or format is invalid")
                 raise SynapseError(
