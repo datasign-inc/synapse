@@ -45,7 +45,7 @@ class HandleSIOPv2ClientMetadata(RestServlet):
             ),
             "request_object_signing_alg": self._ro_signer.decide_alg(),
             "client_name": "OWND Messenger",
-            "logo_uri": "https://messenger.ownd-project.com/themes/element/img/logos/element-logo.svg",
+            "logo_uri": "https://www.ownd-project.com/img/logo_only.png",
         }
 
         return 200, response_data
