@@ -38,11 +38,10 @@ class HandleSIOPv2Response(RestServlet):
             sid, SIOPv2SessionStatus.AUTHORIZED
         )
 
-        response_data = {
-            "message": "Please go back to the application!!",
-        }
+        request.setHeader(b"location", b"/_matrix/static/client/siopv2/index.html")
 
-        return 200, response_data
+        return 302, {"Location": "/_matrix/static/client/siopv2/index.html"}
+
 
     async def on_POST(self, request: SynapseRequest, sid: str) -> Tuple[int, JsonDict]:
         logger.info("Checking session SIOPv2 Response ID: %s\n" % sid)
