@@ -44,6 +44,8 @@ class HandleSIOPv2ClientMetadata(RestServlet):
                 base_url, "/_matrix/client/v3/siopv2_jwks"
             ),
             "request_object_signing_alg": self._ro_signer.decide_alg(),
+            "client_name": "OWND Messenger",
+            "logo_uri": "https://messenger.ownd-project.com/themes/element/img/logos/element-logo.svg",
         }
 
         return 200, response_data
