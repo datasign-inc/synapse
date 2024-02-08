@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 JSON_PATH: Dict[VPType, List[str]] = {
     VPType.AGE_OVER_13: ["$.is_older_than_13"],
-    VPType.AFFILIATION: ["$.division"],
+    VPType.AFFILIATION: ["$.companyName"],
     VPType.JOIN_CONFERENCE: ["$.vc.credentialSubject.name"]
 }
 
