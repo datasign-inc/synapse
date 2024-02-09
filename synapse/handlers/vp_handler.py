@@ -76,7 +76,7 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
                 ],
                 # This indicates that the Conformant Consumer MUST limit
                 # submitted fields to those listed in the fields array
-                "limit_disclosure,": "required",
+                "limit_disclosure": "required",
             },
         }
     ],
@@ -97,7 +97,7 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
                         },
                     }
                 ],
-                "limit_disclosure,": "required",
+                "limit_disclosure": "required",
             },
         }
     ],
@@ -118,7 +118,7 @@ INPUT_DESCRIPTORS: Dict[VPType, List[Dict[str, any]]] = {
                         },
                     }
                 ],
-                "limit_disclosure,": "required",
+                "limit_disclosure": "required",
             },
         }
     ]
