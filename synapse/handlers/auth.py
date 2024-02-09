@@ -51,7 +51,7 @@ from synapse.api.errors import (
     LoginError,
     NotFoundError,
     StoreError,
-    SynapseError,
+    SynapseError, RedirectException,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import (
@@ -1876,7 +1876,16 @@ class AuthHandler:
             user_profile=user_profile_data,
             is_siopv2=siopv2_sid is not None,
         )
-        respond_with_html(request, 200, html)
+
+        if siopv2_sid is None:
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "siopv2_sid is required for signin")
+
+        await self.store.update_siopv2_signin_html(siopv2_sid, html)
+
+        e = RedirectException(("/_matrix/client/v3/siopv2_signin_workaround_step/%s" % siopv2_sid).encode("utf8"))
+        raise e
+
+        # respond_with_html(request, 200, html)
 
     async def _sso_login_callback(self, login_result: "LoginResponse") -> None:
         """
