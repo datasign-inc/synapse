@@ -1818,6 +1818,18 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         (ro_nonce,) = ret
         return ro_nonce
 
+    async def lookup_siopv2_signin_html(self, sid: str) -> Optional[str]:
+        try:
+            ret = await self.db_pool.simple_select_one(
+                table="siopv2_session",
+                keyvalues={"sid": sid},
+                retcols=["signin_confirm_html__workaround_187015221"],
+            )
+        except StoreError:
+            return None
+        (html,) = ret
+        return html
+
     async def lookup_ro_signing_key(self, kid: str) -> Optional[JwkKey]:
         cols = ["kid", "jwk_json_string"]
 
@@ -1884,6 +1896,16 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             table="siopv2_session",
             keyvalues={"sid": sid},
             updatevalues={"status": status.value},
+        )
+
+    async def update_siopv2_signin_html(
+        self, sid: str, html: str
+    ) -> None:
+        # todo: Use transaction
+        await self.db_pool.simple_update_one(
+            table="siopv2_session",
+            keyvalues={"sid": sid},
+            updatevalues={"signin_confirm_html__workaround_187015221": html},
         )
 
     async def invalidate_siopv2_session(self, sid: str) -> None:

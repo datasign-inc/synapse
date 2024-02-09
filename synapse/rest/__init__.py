@@ -70,7 +70,7 @@ from synapse.rest.client import (
     vp_jwks,
     vp_polling,
     vp_request,
-    vp_response,
+    vp_response, siopv2_signin_workaround_step,
 )
 
 if TYPE_CHECKING:
@@ -131,6 +131,7 @@ class ClientRestResource(JsonResource):
             siopv2_polling.register_servlets(hs, client_resource)
             siopv2_client_metadata.register_servlets(hs, client_resource)
             siopv2_jwks.register_servlets(hs, client_resource)
+            siopv2_signin_workaround_step.register_servlets(hs, client_resource)
         if is_main_process:
             vp.register_servlets(hs, client_resource)
             vp_request.register_servlets(hs, client_resource)
