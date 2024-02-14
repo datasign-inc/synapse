@@ -307,6 +307,7 @@ class DeactivateAccountRestServlet(RestServlet):
                 request,
                 body.dict(exclude_unset=True),
                 "deactivate your account",
+                can_skip_ui_auth=True # Temporary solution until UIA and SIOPv2 can be used together.
             )
 
         result = await self._deactivate_account_handler.deactivate_account(
