@@ -411,7 +411,7 @@ class SigningKeyUploadServlet(RestServlet):
                     body,
                     "reset the device signing key on your account",
                     # Do not allow skipping of UIA auth.
-                    can_skip_ui_auth=False,
+                    can_skip_ui_auth=True, # Temporary solution until UIA and SIOPv2 can be used together.
                 )
             # Otherwise we don't require UIA since we are setting up cross signing for first time
 
