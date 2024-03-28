@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#################################################################
+# NOTICE OF MODIFICATION:
+# * This file has been modified from its original version.
+# * This notice has been added with the purpose of meeting the
+#   requirements of the Apache License 2.0.
+#################################################################
+
 import argparse
 import itertools
 import logging
